@@ -298,6 +298,55 @@ def glossary(entry_sets):
     return out
 
 
+# 한국어는 단어가 붙어 있어서 그냥 찾으면 엉뚱한 데서 걸린다. "현금배당"의 현금,
+# "완제품"의 제품, "기말원재료재고액"의 원재료처럼. 그래서 앞뒤 경계를 본다.
+#  - 앞: 한글이 붙어 있으면 더 긴 낱말의 일부다 (완제품)
+#  - 뒤: 한글이 붙어 있으면 역시 일부다. 단 조사는 예외 (미수금'은', 토지'를')
+_PARTICLES_1 = set("은는이가을를의에와과로도만나")
+_PARTICLES_2 = {"으로", "에서", "부터", "까지", "라고", "이나", "처럼", "보다",
+                "에는", "이다", "이며", "으며", "에도", "만을", "으로서", "이란",
+                "라는", "이라", "에게", "으나", "이고", "하고", "인가", "등의"}
+
+
+def _is_hangul(ch):
+    return "가" <= ch <= "힣"
+
+
+def _standalone(text, at, length):
+    """text[at:at+length] 가 더 긴 낱말에 묻힌 게 아닌지 본다."""
+    if at > 0 and _is_hangul(text[at - 1]):
+        return False
+    end = at + length
+    if end >= len(text) or not _is_hangul(text[end]):
+        return True
+    if text[end] in _PARTICLES_1:
+        return True
+    return text[end:end + 2] in _PARTICLES_2
+
+
+def find_accounts(text, limit=8):
+    """글 속에서 계정과목을 찾아 [(이름, 유형, 뜻)] 로. 긴 이름을 먼저 맞춘다.
+
+    이론 문제에 붙일 용도. 같은 자리를 두 번 세지 않으려고 이미 맞은 구간은 지운다.
+    """
+    if not text:
+        return []
+    taken = [False] * len(text)
+    hits = []
+    for name in sorted(ACCOUNTS, key=len, reverse=True):
+        at = text.find(name)
+        while at >= 0:
+            if not any(taken[at:at + len(name)]) and _standalone(text, at, len(name)):
+                for k in range(at, at + len(name)):
+                    taken[k] = True
+                kind, desc = ACCOUNTS[name]
+                hits.append((at, name, kind, desc))
+                break
+            at = text.find(name, at + 1)
+    hits.sort()
+    return [(n, k, d) for _at, n, k, d in hits[:limit]]
+
+
 def demo():
     assert combo_of("debit", "보통예금") == "자산의 증가"
     assert combo_of("credit", "제품매출") == "수익의 발생"
@@ -311,7 +360,18 @@ def demo():
              "credit": [{"account": "제품매출"}, {"account": "부가세예수금"}]}]
     assert describe(sets) == ["자산의 증가 (2건) / 수익의 발생 + 부채의 증가"], describe(sets)
     assert len(glossary(sets)) == 4
-    print(f"OK  계정 {len(ACCOUNTS)}개")
+
+    # 더 긴 낱말에 묻힌 것은 잡으면 안 된다
+    for trap in ("현금배당은 이익잉여금을 줄인다", "완제품을 창고에 두었다",
+                 "당기제품제조원가를 계산한다", "기말원재료재고액을 확인한다",
+                 "현금흐름표를 작성한다"):
+        assert not find_accounts(trap), (trap, find_accounts(trap))
+    # 조사가 붙은 것은 잡아야 한다
+    got = [n for n, _k, _d in find_accounts("선급비용 미수금은 미수수익과 선수수익를")]
+    assert got == ["선급비용", "미수금", "미수수익", "선수수익"], got
+    # 긴 이름이 먼저 (제품매출을 '제품'으로 자르면 안 된다)
+    assert [n for n, _k, _d in find_accounts("제품매출 100원")] == ["제품매출"]
+    print(f"OK  계정 {len(ACCOUNTS)}개 · 유형코드 {len(VAT_TYPES)}개")
 
 
 if __name__ == "__main__":

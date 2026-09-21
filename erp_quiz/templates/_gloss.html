@@ -1,0 +1,13 @@
+{# 문제 본문에 나온 계정과목의 뜻. 실무 카드와 같은 사전(accounts.py)을 쓴다. #}
+{% set gl = account_gloss(q) %}
+{% if gl %}
+  <span class="choices-label">나온 계정과목</span>
+  <div class="gloss">
+    {% for name, kind, text in gl %}
+      <div class="gloss-row">
+        <b>{{ name }}</b><span class="kind kind-{{ kind }}">{{ kind }}</span>
+        <div class="gloss-text">{{ text }}</div>
+      </div>
+    {% endfor %}
+  </div>
+{% endif %}

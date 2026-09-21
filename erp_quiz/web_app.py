@@ -62,6 +62,15 @@ app.secret_key = os.environ.get("SECRET_KEY") or os.urandom(24)
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=365)
 
 QUESTIONS = load_questions()
+
+@app.template_global()
+def account_gloss(q):
+    """이론 문제 본문에 나온 계정과목의 뜻. 실무 카드와 같은 사전을 쓴다.
+    초보자는 '선급비용'이 뭔지 모른 채로는 해설을 읽어도 남는 게 없다."""
+    parts = [q.get("stem") or "", " ".join((q.get("options") or {}).values()),
+             q.get("explanation") or "", q.get("interp") or ""]
+    return accounts.find_accounts(" ".join(parts))
+
 TYPE_LABEL = {"theory": "이론", "bunkae": "분개연습", "practical": "실기"}
 
 # 오답노트를 문제 id(긴 문자열) 그대로 쿠키에 쌓으면 금방 브라우저 쿠키 용량

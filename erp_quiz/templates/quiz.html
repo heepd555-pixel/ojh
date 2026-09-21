@@ -67,6 +67,8 @@
           <div class="explanation">{{ q.interp }}</div>
         {% endif %}
 
+        {% include "_gloss.html" %}
+
         {% if selected %}
           {% if selected == q.answer %}
             <div class="result-banner correct">✓ 맞았습니다!</div>
@@ -111,6 +113,8 @@
       {% if q.explanation %}
         <div class="explanation">{{ q.explanation }}</div>
       {% endif %}
+
+      {% include "_gloss.html" %}
 
       <form method="post" action="{{ url_for('next_question') }}">
         <button type="submit">{{ "결과 보기" if is_last else "다음 문제" }}</button>
