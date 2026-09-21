@@ -33,6 +33,25 @@
            padding: 10px 12px; margin-top: 8px; }
   .steps li { margin: 4px 0; }
   .steps ul { margin: 0; padding-left: 18px; }
+  .combo {
+    font-size: 0.95rem; font-weight: 700; color: var(--accent);
+    background: var(--accent-soft); border-radius: 10px;
+    padding: 10px 12px; margin-bottom: 6px; text-align: center;
+  }
+  .gloss { border-top: 1px dashed var(--border); padding-top: 10px; }
+  .gloss-row { padding: 8px 0; border-bottom: 1px solid var(--border); }
+  .gloss-row:last-child { border-bottom: none; }
+  .gloss-row b { font-size: 0.95rem; }
+  .gloss-text { font-size: 0.85rem; color: var(--ink-soft); margin-top: 3px; line-height: 1.5; }
+  .kind {
+    font-size: 0.68rem; padding: 1px 7px; border-radius: 999px;
+    margin-left: 6px; vertical-align: 1px; font-weight: 700;
+  }
+  .kind-자산, .kind-자산차감 { background: #e7f0ff; color: #2a55a8; }
+  .kind-부채 { background: #fdeee2; color: #a8551d; }
+  .kind-자본 { background: #f0e8fb; color: #6a3ea8; }
+  .kind-수익 { background: var(--good-bg); color: var(--good); }
+  .kind-비용 { background: var(--bad-bg); color: var(--bad); }
 </style>
 
 <p class="progress">{{ idx }} / {{ total }}</p>
@@ -80,11 +99,25 @@
     {% if p.menu %}<span class="badge">{{ p.menu }}</span>{% endif %}
 
     {% if p.vat %}
+      <span class="q-label">매입매출전표 입력값</span>
       <div class="vat">
         {% for k, v in p.vat.items() %}<b>{{ k }}</b> {{ v }}{% if not loop.last %} · {% endif %}{% endfor %}
       </div>
+      {% if vat_kind %}
+        {# 유형코드를 고르는 게 매입매출 문항의 절반이라, 왜 이 코드인지 붙인다 #}
+        <div class="gloss-row" style="border:none;padding-top:0">
+          <b>{{ vat_kind[0] }}.{{ vat_kind[1] }}</b><span class="kind kind-{{ '수익' if vat_kind[2] == '매출' else '비용' }}">{{ vat_kind[2] }}</span>
+          <div class="gloss-text">{{ vat_kind[3] }}</div>
+        </div>
+      {% endif %}
     {% endif %}
 
+    {% if combos %}
+      <span class="q-label">결합관계 — 무엇이 늘고 줄었나</span>
+      {% for c in combos %}<div class="combo">{{ c }}</div>{% endfor %}
+    {% endif %}
+
+    {% if p.entry_sets %}<span class="q-label">분개</span>{% endif %}
     {% for s in p.entry_sets %}
       {% if p.entry_sets|length > 1 %}
         <div class="set-label">{{ s.label or '분개 %d'|format(loop.index) }}</div>
@@ -117,6 +150,18 @@
       <div class="steps"><ul>
         {% for n in p.notes %}<li>{{ n.lstrip('ㆍ· ') }}</li>{% endfor %}
       </ul></div>
+    {% endif %}
+
+    {% if glossary %}
+      <span class="q-label">쓰인 계정과목</span>
+      <div class="gloss">
+        {% for name, kind, text in glossary %}
+          <div class="gloss-row">
+            <b>{{ name }}</b><span class="kind kind-{{ kind }}">{{ kind }}</span>
+            <div class="gloss-text">{{ text }}</div>
+          </div>
+        {% endfor %}
+      </div>
     {% endif %}
 
     {% if p.images %}

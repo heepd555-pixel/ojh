@@ -7,6 +7,7 @@
 import os
 import sys
 
+from accounts import vat_type
 from extract_official import EXAMS, answer_pdfs, iter_items
 
 SOURCE = sys.argv[1] if len(sys.argv) > 1 else "../세무회계_기출_118-126"
@@ -91,6 +92,16 @@ def main():
            if i["vat"].get("공급가액", "").replace("원", "").strip().isdigit()
            and len(i["vat"]["공급가액"].replace("원", "").strip()) <= 3]
     assert not cut, f"공급가액이 잘린 문항: {cut[:5]}"
+
+    # 6c) 유형 값은 "51.과세" 처럼 짧다. 항목 구분이 공백뿐인 회차에서 줄 전체를
+    #     한 값으로 삼켜 "51.과세공급가액:1,000,000원…" 이 되던 적이 있다.
+    import re
+    long_type = [i["id"] for i in with_vat
+                 if not re.fullmatch(r"\d{2}\s*\.?\s*[가-힣]+( 또는 \d{2}\s*\.?\s*[가-힣]+)?",
+                                     i["vat"]["유형"])]
+    assert not long_type, f"유형 값이 통째로 삼켜진 문항: {long_type[:5]}"
+    unknown = [i["vat"]["유형"] for i in with_vat if not vat_type(i["vat"]["유형"])]
+    assert not unknown, f"사전에 없는 유형코드: {set(unknown)}"
 
     print(f"OK  {len(items)}문항 (회계1급 {len(hoegye)} / 세무2급 {len(semu)})")
     print(f"OK  대차일치 {sum(1 for i in items.values() if i['has_entry'])}건 전부")

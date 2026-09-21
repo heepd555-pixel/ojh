@@ -24,6 +24,7 @@ from datetime import timedelta
 
 from flask import Flask, redirect, render_template, request, session, url_for
 
+import accounts
 from quiz import filter_questions, load_questions, round_sort_key
 
 EXAM_LABELS = {
@@ -518,6 +519,11 @@ def silmu_card():
         "silmu_card.html", p=p, section_label=_section_label(p),
         idx=i + 1, total=len(idxs), revealed=session.get("silmu_reveal", False),
         is_last=(i + 1 == len(idxs)),
+        # 분개만 보여주면 왜 그렇게 되는지 알 수 없다. 결합관계(무엇이 늘고 줄었나)와
+        # 쓰인 계정의 뜻, 유형코드 설명을 같이 붙인다. 전부 계정과목 사전에서 나온다.
+        combos=accounts.describe(p["entry_sets"]),
+        glossary=accounts.glossary(p["entry_sets"]),
+        vat_kind=accounts.vat_type((p.get("vat") or {}).get("유형", "")),
     )
 
 

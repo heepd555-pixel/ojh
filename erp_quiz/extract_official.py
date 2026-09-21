@@ -49,8 +49,9 @@ DATE = re.compile(r"^(\d{4})[.\-](\d{1,2})[.\-](\d{1,2})\.?$")
 ROUND = re.compile(r"제?(\d{2,3})회")
 # "유형 : 53. 면세, 공급가액 : 920,000원, 부가세 : 0원, ..." 꼴.
 # 값을 쉼표까지로 끊으면 금액이 잘린다(920,000원 -> "920"). 그래서 쉼표가 아니라
-# "다음 항목 이름 +:" 이 나오는 자리까지를 한 값으로 본다.
-VAT_FIELD = re.compile(r"([가-힣]+)\s*[:：]\s*(.+?)(?=\s*,\s*[가-힣]+\s*[:：]|$)")
+# "다음 항목 이름 +:" 이 나오는 자리까지를 한 값으로 본다. 항목 사이가 쉼표가
+# 아니라 공백뿐인 회차도 있어서 쉼표는 있어도 없어도 되게 둔다.
+VAT_FIELD = re.compile(r"([가-힣]+)\s*[:：]\s*(.+?)(?=\s*,?\s*[가-힣]+\s*[:：]|$)")
 
 
 def to_int(tok):
@@ -380,11 +381,25 @@ def parse_entries(rows):
     return out, notes, date
 
 
+# 유형 값은 "51.과세", "14. 건별 또는 22. 현과" 꼴. 뒤에 오는 항목은 콜론이 빠진
+# 회차가 있어서("공급가액 3,000,000원") 일반 규칙으로는 유형이 줄 끝까지 삼켜진다.
+# 그래서 유형만 먼저 떼어내고 나머지를 따로 읽는다.
+VAT_CODE = re.compile(r"(\d{2}\s*\.?\s*[가-힣]+(?:\s*또는\s*\d{2}\s*\.?\s*[가-힣]+)?)")
+
+
 def parse_vat(lines):
     """'유형 : 53. 면세, 공급가액 : 920,000원, ...' 줄을 딕셔너리로."""
     for line in lines:
         if line and "유형" in line and ("공급가액" in line or "분개" in line):
-            got = {k: v.strip().rstrip(",") for k, v in VAT_FIELD.findall(line)}
+            head, _sep, tail = line.partition("유형")
+            got = {}
+            m = VAT_CODE.search(tail)
+            if m:
+                got["유형"] = re.sub(r"\s+", " ", m.group(1)).strip()
+                tail = tail[m.end():]
+            for k, v in VAT_FIELD.findall(head + " " + tail):
+                if k != "유형":
+                    got[k] = v.strip().rstrip(",")
             if got:
                 return got
     return None
