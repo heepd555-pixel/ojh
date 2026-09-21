@@ -56,4 +56,7 @@
   {% if exam != "분개연습" %}
     <a class="btn btn-secondary" href="{{ url_for('exam_setup', exam=exam) }}">📝 시험모드로 풀기</a>
   {% endif %}
+  {% if exam in ("전산회계1급", "전산세무2급") %}
+    <a class="btn btn-secondary" href="{{ url_for('silmu_setup', exam=exam) }}">🗂 실무 카드 (118~126회)</a>
+  {% endif %}
 {% endblock %}

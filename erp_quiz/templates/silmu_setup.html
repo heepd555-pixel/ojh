@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}실무 카드{% endblock %}
+{% block content %}
+<h1>실무 카드</h1>
+<p class="sub">확정답안 118~126회 · 거래를 보고 분개한 뒤 답을 펼쳐 스스로 채점</p>
+
+<div class="exam-switch">
+  <a href="{{ url_for('silmu_setup', exam='전산회계1급') }}"
+     class="{{ 'active' if exam == '전산회계1급' }}">전산회계1급</a>
+  <a href="{{ url_for('silmu_setup', exam='전산세무2급') }}"
+     class="{{ 'active' if exam == '전산세무2급' }}">전산세무2급</a>
+</div>
+
+<form method="post" action="{{ url_for('silmu_start') }}">
+  <input type="hidden" name="exam" value="{{ exam }}">
+  <div class="card">
+    <label>회차</label>
+    <select name="round">
+      <option value="">전체 ({{ total }}문항)</option>
+      {% for r in rounds %}<option value="{{ r }}">{{ r }}</option>{% endfor %}
+    </select>
+
+    <label>유형</label>
+    <select name="section">
+      <option value="">전체</option>
+      {% for sec, label in sections %}<option value="{{ sec }}">{{ label }}</option>{% endfor %}
+    </select>
+
+    <label>장수 (0 = 전부)</label>
+    <input type="number" name="count" value="20" min="0" max="400">
+
+    <div class="checkbox-row">
+      <input type="checkbox" name="shuffle" id="shuffle">
+      <label for="shuffle" style="margin:0">섞기 (끄면 최신 회차 · 문제 순서대로)</label>
+    </div>
+
+    {% if hard_count %}
+    <div class="checkbox-row">
+      <input type="checkbox" name="review" id="review">
+      <label for="review" style="margin:0">헷갈린 것만 ({{ hard_count }}장)</label>
+    </div>
+    {% endif %}
+
+    <button type="submit">시작</button>
+  </div>
+</form>
+
+<a class="btn btn-secondary" href="{{ url_for('setup') }}">이론 문제로</a>
+{% endblock %}

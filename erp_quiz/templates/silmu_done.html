@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}실무 카드 끝{% endblock %}
+{% block content %}
+<h1>{{ total }}장 끝</h1>
+<p class="sub">알았음 {{ ok }} · 헷갈림 {{ hard|length }}</p>
+
+<div class="card">
+  <div class="score-big">{{ ok }} / {{ total }}</div>
+  {% if hard %}
+    <span class="q-label">헷갈린 카드</span>
+    {% for p in hard %}
+      <div class="wrong-item">{{ p.round }} {{ section_label(p) }} [{{ p.no }}]
+        — {{ p.question[:60] }}…</div>
+    {% endfor %}
+  {% else %}
+    <p class="sub" style="margin:0">헷갈린 카드 없음.</p>
+  {% endif %}
+</div>
+
+{% if left %}
+<a class="btn" href="{{ url_for('silmu_setup') }}">헷갈린 것만 다시 ({{ left }}장)</a>
+{% endif %}
+<a class="btn btn-secondary" href="{{ url_for('silmu_setup') }}">다른 범위 고르기</a>
+<a class="btn btn-secondary" href="{{ url_for('setup') }}">이론 문제로</a>
+{% endblock %}

@@ -15,6 +15,7 @@ quiz.py 의 문제 로딩/필터링/오답노트 로직을 그대로 재사용�
 [ 참고 ]
 이 서버는 같은 와이파이 안에서만 접속 가능합니다 (외부 인터넷에 공개되지 않음).
 """
+import json
 import os
 import random
 import re
@@ -402,6 +403,156 @@ def summary():
     pct = round(score / attempted * 100) if attempted else 0
     return render_template(
         "summary.html", score=score, attempted=attempted, pct=pct, wrong_qs=wrong_qs,
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 실무 카드 (전산회계1급 · 전산세무2급 확정답안)
+#
+# 이론처럼 객관식으로 채점할 수 없는 실무시험용 화면. 거래를 보고 머리로 분개한
+# 다음 답을 펼쳐서 스스로 맞춰 보는 방식이고, 부가세신고서·원천징수처럼 분개로
+# 떨어지지 않는 문항은 확정답안에 실린 KcLep 화면을 그대로 보여준다.
+# 데이터는 extract_official.py 가 official.json 으로 만들어 둔다.
+# ─────────────────────────────────────────────────────────────────────
+_OFFICIAL = os.path.join(os.path.dirname(os.path.abspath(__file__)), "official.json")
+try:
+    with open(_OFFICIAL, encoding="utf-8") as _f:
+        PRACTICE = json.load(_f)
+except FileNotFoundError:
+    PRACTICE = []
+
+# 세션 쿠키가 4KB를 넘으면 통째로 날아가므로, 이론 오답노트와 같은 방식으로
+# 긴 문항 id 대신 정수 인덱스를 담는다.
+_P_INDEX = {p["id"]: i for i, p in enumerate(PRACTICE)}
+SECTION_LABELS = {
+    ("전산회계1급", "문제1"): "기초정보·전기분",
+    ("전산회계1급", "문제2"): "일반전표",
+    ("전산회계1급", "문제3"): "매입매출전표",
+    ("전산회계1급", "문제4"): "오류수정",
+    ("전산회계1급", "문제5"): "결산정리",
+    ("전산회계1급", "문제6"): "장부조회",
+    ("전산세무2급", "문제1"): "일반전표",
+    ("전산세무2급", "문제2"): "매입매출전표",
+    ("전산세무2급", "문제3"): "부가가치세",
+    ("전산세무2급", "문제4"): "결산정리",
+    ("전산세무2급", "문제5"): "원천징수",
+}
+
+
+def _section_label(p):
+    return SECTION_LABELS.get((p["exam"], p["section"]), p["section"])
+
+
+def _practice_catalog(exam):
+    qs = [p for p in PRACTICE if p["exam"] == exam]
+    rounds = sorted({p["round"] for p in qs},
+                    key=lambda r: int(re.search(r"\d+", r).group()), reverse=True)
+    seen, sections = set(), []
+    for p in sorted(qs, key=lambda p: p["section"]):
+        if p["section"] not in seen:
+            seen.add(p["section"])
+            sections.append((p["section"], _section_label(p)))
+    return rounds, sections
+
+
+def _practice_review():
+    return {PRACTICE[i]["id"] for i in session.get("silmu_review", []) if i < len(PRACTICE)}
+
+
+@app.route("/silmu")
+def silmu_setup():
+    exam = request.args.get("exam")
+    if exam not in ("전산회계1급", "전산세무2급"):
+        exam = "전산회계1급"
+    rounds, sections = _practice_catalog(exam)
+    return render_template(
+        "silmu_setup.html", exam=exam, rounds=rounds, sections=sections,
+        hard_count=len(_practice_review()), total=len([p for p in PRACTICE if p["exam"] == exam]),
+    )
+
+
+@app.route("/silmu/start", methods=["GET", "POST"])
+def silmu_start():
+    """GET도 받는다: /silmu/start?exam=전산세무2급&section=문제2 처럼 특정 묶음을
+    바로 열 수 있어 휴대폰에 북마크해 두고 쓸 수 있다."""
+    f = request.values
+    exam = f.get("exam", "전산회계1급")
+    if f.get("review") == "on":
+        pool = [p for p in PRACTICE if p["id"] in _practice_review()]
+    else:
+        rnd = f.get("round") or ""
+        sec = f.get("section") or ""
+        pool = [p for p in PRACTICE if p["exam"] == exam
+                and (not rnd or p["round"] == rnd)
+                and (not sec or p["section"] == sec)]
+    if f.get("shuffle") == "on":
+        random.shuffle(pool)
+    else:
+        pool.sort(key=lambda p: (-int(re.search(r"\d+", p["round"]).group()),
+                                 p["section"], p["no"]))
+    count = int(f.get("count") or 0)
+    if count:
+        pool = pool[:count]
+    if not pool:
+        return redirect(url_for("silmu_setup", exam=exam))
+
+    session["silmu_ids"] = [_P_INDEX[p["id"]] for p in pool]
+    session["silmu_idx"] = 0
+    session["silmu_reveal"] = False
+    session["silmu_hard"] = []
+    session["silmu_ok"] = 0
+    session.permanent = True
+    return redirect(url_for("silmu_card"))
+
+
+@app.route("/silmu/card")
+def silmu_card():
+    idxs = session.get("silmu_ids")
+    if not idxs:
+        return redirect(url_for("silmu_setup"))
+    i = session.get("silmu_idx", 0)
+    if i >= len(idxs):
+        return redirect(url_for("silmu_done"))
+    p = PRACTICE[idxs[i]]
+    return render_template(
+        "silmu_card.html", p=p, section_label=_section_label(p),
+        idx=i + 1, total=len(idxs), revealed=session.get("silmu_reveal", False),
+        is_last=(i + 1 == len(idxs)),
+    )
+
+
+@app.route("/silmu/flip", methods=["POST"])
+def silmu_flip():
+    session["silmu_reveal"] = True
+    return redirect(url_for("silmu_card"))
+
+
+@app.route("/silmu/mark", methods=["POST"])
+def silmu_mark():
+    """스스로 채점하고 다음 장으로. '헷갈림'은 다음 번에 그것만 모아 볼 수 있게 남긴다."""
+    idxs = session.get("silmu_ids") or []
+    i = session.get("silmu_idx", 0)
+    if i < len(idxs):
+        review = set(session.get("silmu_review", []))
+        if request.form.get("how") == "hard":
+            review.add(idxs[i])
+            session["silmu_hard"] = session.get("silmu_hard", []) + [idxs[i]]
+        else:
+            review.discard(idxs[i])
+            session["silmu_ok"] = session.get("silmu_ok", 0) + 1
+        session["silmu_review"] = sorted(review)
+    session["silmu_idx"] = i + 1
+    session["silmu_reveal"] = False
+    return redirect(url_for("silmu_card"))
+
+
+@app.route("/silmu/done")
+def silmu_done():
+    idxs = session.get("silmu_ids") or []
+    hard = [PRACTICE[i] for i in session.get("silmu_hard", []) if i < len(PRACTICE)]
+    return render_template(
+        "silmu_done.html", total=len(idxs), ok=session.get("silmu_ok", 0),
+        hard=hard, section_label=_section_label, left=len(_practice_review()),
     )
 
 

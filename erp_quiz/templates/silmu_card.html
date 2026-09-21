@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block title %}{{ p.round }} {{ section_label }}{% endblock %}
+{% block content %}
+<style>
+  .entry { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 0.9rem; }
+  .entry th { font-size: 0.72rem; color: var(--ink-soft); text-align: left;
+              font-weight: 600; padding: 4px 8px; border-bottom: 1px solid var(--border); }
+  .entry td { padding: 7px 8px; vertical-align: top; border-bottom: 1px solid var(--border); }
+  .entry td.amt { text-align: right; font-family: ui-monospace, Consolas, monospace;
+                  white-space: nowrap; }
+  .entry tr:last-child td { border-bottom: none; }
+  .entry .dr { background: var(--accent-soft); }
+  .entry .cr { background: var(--good-bg); }
+  .entry .sub-note { display: block; font-size: 0.75rem; color: var(--ink-soft); }
+  .set-label { font-size: 0.75rem; font-weight: 700; color: var(--accent); margin-top: 12px; }
+  .vat { font-size: 0.85rem; background: var(--paper); border-radius: 10px;
+         padding: 10px 12px; margin: 10px 0; }
+  .vat b { color: var(--accent); }
+  .shot { display: block; width: 100%; height: auto; border: 1px solid var(--border);
+          border-radius: 8px; margin: 8px 0; }
+  .shot-hint { font-size: 0.75rem; color: var(--ink-soft); margin: 10px 0 2px; }
+  .mark-row { display: flex; gap: 10px; }
+  .mark-row button { margin-top: 14px; }
+  .mark-row .hard { background: var(--bad-bg); color: var(--bad); }
+  .fix { font-size: 0.78rem; color: var(--bad); margin-top: 6px; }
+  .answer-big {
+    font-size: 1.35rem; font-weight: 800; color: var(--good);
+    background: var(--good-bg); border-radius: 10px;
+    padding: 12px 14px; margin: 10px 0; text-align: center;
+    font-family: ui-monospace, Consolas, monospace;
+  }
+  .steps { font-size: 0.88rem; background: var(--paper); border-radius: 10px;
+           padding: 10px 12px; margin-top: 8px; }
+  .steps li { margin: 4px 0; }
+  .steps ul { margin: 0; padding-left: 18px; }
+</style>
+
+<p class="progress">{{ idx }} / {{ total }}</p>
+<div class="card">
+  <div>
+    <span class="badge">{{ p.exam }}</span>
+    <span class="badge">{{ p.round }}</span>
+    <span class="badge">{{ section_label }}</span>
+    {% if p.points %}<span class="badge">{{ p.points }}점</span>{% endif %}
+  </div>
+
+  <span class="q-label">거래 / 자료</span>
+  {% if p.q_render %}
+    {# 세금계산서처럼 서식이 있는 문항은 글자로 풀면 숫자 나열이 되므로 시험지
+       그대로 잘라 보여준다. 글자 버전은 접어 두고 필요할 때만 편다. #}
+    {% for name in p.q_render %}
+      <img class="shot" loading="lazy"
+           src="{{ url_for('static', filename='official/' + name) }}" alt="문제">
+    {% endfor %}
+    <details><summary class="shot-hint">글자로 보기</summary>
+      <div class="explanation">{{ p.question }}</div></details>
+  {% else %}
+    <div class="stem">{{ p.question }}</div>
+  {% endif %}
+
+  {# 이미지로 실린 증빙(카드전표 등)도 문제를 풀 때 봐야 하므로 앞면에 둔다.
+     문제 영역을 통째로 렌더한 경우엔 그 안에 이미 들어 있으므로 또 보이지 않는다. #}
+  {% if not p.q_render %}
+    {% for name in p.q_images %}
+      <img class="shot" loading="lazy"
+           src="{{ url_for('static', filename='official/' + name) }}" alt="증빙 서식">
+    {% endfor %}
+  {% endif %}
+
+  {% if not revealed %}
+    <form method="post" action="{{ url_for('silmu_flip') }}">
+      <button type="submit">답 보기</button>
+    </form>
+  {% else %}
+
+    {% if p.answer_text %}
+      {# 장부조회처럼 답이 값 하나인 문항 #}
+      <div class="answer-big">{{ p.answer_text }}</div>
+    {% endif %}
+    {% if p.menu %}<span class="badge">{{ p.menu }}</span>{% endif %}
+
+    {% if p.vat %}
+      <div class="vat">
+        {% for k, v in p.vat.items() %}<b>{{ k }}</b> {{ v }}{% if not loop.last %} · {% endif %}{% endfor %}
+      </div>
+    {% endif %}
+
+    {% for s in p.entry_sets %}
+      {% if p.entry_sets|length > 1 %}
+        <div class="set-label">{{ s.label or '분개 %d'|format(loop.index) }}</div>
+      {% endif %}
+      <table class="entry">
+        <tr><th>차변</th><th></th><th>대변</th><th></th></tr>
+        {% set rows = [s.debit|length, s.credit|length]|max %}
+        {% for i in range(rows) %}
+        <tr>
+          {% if i < s.debit|length %}
+            <td class="dr">{{ s.debit[i].account }}
+              {% if s.debit[i].note %}<span class="sub-note">{{ s.debit[i].note }}</span>{% endif %}</td>
+            <td class="dr amt">{{ "{:,}".format(s.debit[i].amount) }}</td>
+          {% else %}<td></td><td></td>{% endif %}
+          {% if i < s.credit|length %}
+            <td class="cr">{{ s.credit[i].account }}
+              {% if s.credit[i].note %}<span class="sub-note">{{ s.credit[i].note }}</span>{% endif %}</td>
+            <td class="cr amt">{{ "{:,}".format(s.credit[i].amount) }}</td>
+          {% else %}<td></td><td></td>{% endif %}
+        </tr>
+        {% endfor %}
+      </table>
+      {% for e in s.debit + s.credit %}
+        {% if e.correction %}<p class="fix">※ 확정답안 원문 오식 — {{ e.correction }}</p>{% endif %}
+      {% endfor %}
+    {% endfor %}
+
+    {% if p.notes %}
+      {# 기초정보·결산처럼 '어느 메뉴에 무엇을 넣는가'가 답인 문항은 단계 목록이다 #}
+      <div class="steps"><ul>
+        {% for n in p.notes %}<li>{{ n.lstrip('ㆍ· ') }}</li>{% endfor %}
+      </ul></div>
+    {% endif %}
+
+    {% if p.images %}
+      <p class="shot-hint">확정답안 KcLep 화면 {{ p.images|length }}장</p>
+      {% for name in p.images %}
+        <img class="shot" loading="lazy"
+             src="{{ url_for('static', filename='official/' + name) }}" alt="정답 화면">
+      {% endfor %}
+    {% endif %}
+
+    <form method="post" action="{{ url_for('silmu_mark') }}">
+      <div class="mark-row">
+        <button type="submit" name="how" value="ok">알았음</button>
+        <button type="submit" name="how" value="hard" class="hard">헷갈림</button>
+      </div>
+    </form>
+  {% endif %}
+</div>
+
+<a class="btn btn-secondary" href="{{ url_for('silmu_setup', exam=p.exam) }}">그만두기</a>
+{% endblock %}
