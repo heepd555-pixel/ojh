@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}{{ g.title }}{% endblock %}
+{% block content %}
+<style>
+  .entry { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 0.9rem; }
+  .entry th { font-size: 0.72rem; color: var(--ink-soft); text-align: left;
+              font-weight: 600; padding: 4px 8px; border-bottom: 1px solid var(--border); }
+  .entry td { padding: 7px 6px; vertical-align: top; word-break: keep-all;
+              border-bottom: 1px solid var(--border); }
+  .entry td.code { font-family: ui-monospace, Consolas, monospace; font-weight: 700;
+                   color: var(--accent); white-space: nowrap; width: 1%; }
+  .entry td.amt { text-align: right; font-family: ui-monospace, Consolas, monospace;
+                  white-space: nowrap; }
+  .entry tr:last-child td { border-bottom: none; }
+  .entry .dr { background: var(--accent-soft); }
+  .entry .cr { background: var(--good-bg); }
+  .entry .sub-note { display: block; font-size: 0.75rem; color: var(--ink-soft); }
+  .why-row { padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 0.88rem; }
+  .why-row:last-child { border-bottom: none; }
+  .why-side { display: inline-block; font-size: 0.72rem; font-weight: 700;
+              padding: 2px 7px; border-radius: 6px; margin-right: 7px; }
+  .why-side.dr { background: var(--accent-soft); color: var(--accent); }
+  .why-side.cr { background: var(--good-bg); color: var(--good); }
+  .why-text { font-size: 0.8rem; color: var(--ink-soft); margin-top: 3px; }
+  .eight { margin-top: 10px; font-size: 0.8rem; color: var(--ink-soft); }
+  .eight summary { cursor: pointer; color: var(--accent); }
+  .eight-row { padding: 4px 0; }
+  .var { font-size: 0.85rem; padding: 6px 0; border-bottom: 1px solid var(--border); }
+  .var:last-child { border-bottom: none; }
+  .var .cnt { float: right; color: var(--accent); font-weight: 700; font-size: 0.78rem; }
+  .var .side { font-family: ui-monospace, Consolas, monospace; font-size: 0.8rem; }
+  .q-list a { display: block; padding: 8px 0; border-bottom: 1px solid var(--border);
+              color: inherit; text-decoration: none; font-size: 0.85rem; }
+  .q-list a:last-child { border-bottom: none; }
+  .q-list .stem { color: var(--ink-soft); display: -webkit-box; -webkit-line-clamp: 2;
+                  -webkit-box-orient: vertical; overflow: hidden; }
+  .nav-row { display: flex; gap: 10px; margin-top: 16px; }
+  .nav-row a { flex: 1; text-align: center; }
+</style>
+
+<p class="progress">{{ g.band }} · {{ g.count }}문항 · {{ g.points }}점</p>
+<div class="card">
+  <h1 style="margin-top:0">{{ g.title }}</h1>
+  <p class="sub">{{ g.hint }}</p>
+  {% for e in g.exams %}<span class="badge">{{ e }}</span>{% endfor %}
+
+  {% if g.rep %}
+    {% if combos %}
+      <span class="q-label">결합관계 — 무엇이 늘고 줄었나</span>
+      {% for c in combos %}<div class="combo">{{ c }}</div>{% endfor %}
+    {% endif %}
+
+    <span class="q-label">이 유형의 기본 분개 (가장 많이 나온 모양)</span>
+    {% set s = g.rep.entry_sets[-1] %}
+    <table class="entry">
+      <tr><th>코드</th><th>차변</th><th></th><th>코드</th><th>대변</th><th></th></tr>
+      {% set rows = [s.debit|length, s.credit|length]|max %}
+      {% for i in range(rows) %}
+      <tr>
+        {% if i < s.debit|length %}
+          <td class="dr code">{{ acct_code(s.debit[i].account) or '—' }}</td>
+          <td class="dr">{{ s.debit[i].account }}
+            {% if acct_code_note(s.debit[i].account) %}
+              <span class="sub-note">{{ acct_code_note(s.debit[i].account) }}</span>{% endif %}</td>
+          <td class="dr amt">{{ "{:,}".format(s.debit[i].amount) }}</td>
+        {% else %}<td></td><td></td><td></td>{% endif %}
+        {% if i < s.credit|length %}
+          <td class="cr code">{{ acct_code(s.credit[i].account) or '—' }}</td>
+          <td class="cr">{{ s.credit[i].account }}
+            {% if acct_code_note(s.credit[i].account) %}
+              <span class="sub-note">{{ acct_code_note(s.credit[i].account) }}</span>{% endif %}</td>
+          <td class="cr amt">{{ "{:,}".format(s.credit[i].amount) }}</td>
+        {% else %}<td></td><td></td><td></td>{% endif %}
+      </tr>
+      {% endfor %}
+    </table>
+    <p class="sub" style="font-size:0.78rem">금액과 거래처만 바뀔 뿐 구조는 아래 목록 내내 같다.
+      코드가 '—'인 계정은 아직 못 채운 것이니 KcLep [계정과목및적요등록]에서 확인할 것.</p>
+
+    {% with entry_sets = [s] %}{% include "_why.html" %}{% endwith %}
+
+    {% if g.variants|length > 1 %}
+      <span class="q-label">이 유형 안에서 나온 계정 조합 {{ g.variants|length }}가지</span>
+      {% for debit, credit, n in g.variants %}
+        <div class="var">
+          <span class="cnt">{{ n }}회</span>
+          <span class="side">{{ debit|join(' + ') or '—' }}</span>
+          &nbsp;/&nbsp;<span class="side">{{ credit|join(' + ') or '—' }}</span>
+        </div>
+      {% endfor %}
+    {% endif %}
+  {% endif %}
+
+  {% if glossary %}
+    <span class="q-label">쓰인 계정과목</span>
+    <div class="gloss">
+      {% for name, kind, text in glossary %}
+        <div class="gloss-row">
+          <b>{{ acct_code(name) or '—' }} {{ name }}</b><span class="kind kind-{{ kind }}">{{ kind }}</span>
+          <div class="gloss-text">{{ text }}</div>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <form method="get" action="{{ url_for('silmu_start') }}">
+    <input type="hidden" name="pat" value="{{ g.slug }}">
+    <button type="submit">이 유형 {{ g.count }}문항 카드로 풀기</button>
+  </form>
+</div>
+
+<div class="card">
+  <span class="q-label">이 유형으로 나온 문항</span>
+  <div class="q-list">
+    {% for p in items %}
+      <a href="{{ url_for('silmu_start', pat=g.slug) }}">
+        <span class="badge">{{ p.round }}</span>
+        <span class="badge">{{ section_label(p) }}</span>
+        <div class="stem">{{ p.question[:90] }}</div>
+      </a>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="nav-row">
+  {% if prev %}<a class="btn btn-secondary" href="{{ url_for('pattern_page', slug=prev.slug) }}">← {{ prev.title[:14] }}</a>{% endif %}
+  <a class="btn btn-secondary" href="{{ url_for('pattern_index', band=g.band) }}">목차</a>
+  {% if next %}<a class="btn btn-secondary" href="{{ url_for('pattern_page', slug=next.slug) }}">{{ next.title[:14] }} →</a>{% endif %}
+</div>
+{% endblock %}

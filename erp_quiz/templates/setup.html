@@ -58,5 +58,6 @@
   {% endif %}
   {% if exam in ("전산회계1급", "전산세무2급") %}
     <a class="btn btn-secondary" href="{{ url_for('silmu_setup', exam=exam) }}">🗂 실무 카드 (118~126회)</a>
+    <a class="btn btn-secondary" href="{{ url_for('pattern_index') }}">📘 유형 교재 (실무 386문항을 유형별로)</a>
   {% endif %}
 {% endblock %}

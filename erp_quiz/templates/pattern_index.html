@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}유형 교재{% endblock %}
+{% block content %}
+<style>
+  .pat-row { display: block; padding: 12px 14px; margin: 8px 0; background: var(--card);
+             border: 1px solid var(--border); border-radius: 12px;
+             color: inherit; text-decoration: none; }
+  .pat-row .name { font-weight: 700; font-size: 1rem; }
+  .pat-row .hint { font-size: 0.8rem; color: var(--ink-soft); margin-top: 4px;
+                   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+                   overflow: hidden; }
+  .pat-row .n { float: right; font-size: 0.78rem; color: var(--accent); font-weight: 700;
+                white-space: nowrap; margin-left: 10px; }
+</style>
+
+<h1>유형 교재</h1>
+<p class="sub">118~126회 실무 386문항을 유형으로 묶었다. 문항을 푸는 게 아니라
+  "이 유형은 항상 이 분개"를 읽는 자료다.</p>
+
+<div class="exam-switch">
+  {% for b in bands %}
+    <a href="{{ url_for('pattern_index', band=b) }}"
+       class="{{ 'active' if b == band }}">{{ b }} {{ totals[b] }}</a>
+  {% endfor %}
+</div>
+
+{% for g in groups %}
+  <a class="pat-row" href="{{ url_for('pattern_page', slug=g.slug) }}">
+    <span class="n">{{ g.count }}문항 · {{ g.points }}점</span>
+    <div class="name">{{ g.title }}</div>
+    <div class="hint">{{ g.hint }}</div>
+  </a>
+{% endfor %}
+
+<a class="btn btn-secondary" href="{{ url_for('silmu_setup') }}">실무 카드로</a>
+{% endblock %}

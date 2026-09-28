@@ -1,0 +1,21 @@
+{# 분개에서 좌우를 정하는 이유. 계정 유형 + 늘었나/줄었나 만으로 기계적으로
+   정해지므로 문항마다 쓴 글이 아니라 accounts.SIDE_RULE 에서 조립된 것이다. #}
+{% set rows = why_side(entry_sets) %}
+{% if rows %}
+<span class="q-label">왜 이쪽인가</span>
+<div class="why">
+  {% for side, code, name, combo, rule in rows %}
+    <div class="why-row">
+      <span class="why-side {{ 'dr' if '차변' in side else 'cr' }}">{{ side }}</span>
+      <b>{{ code or '—' }} {{ name }}</b>
+      <div class="why-text">{{ combo }} — {{ rule }}</div>
+    </div>
+  {% endfor %}
+</div>
+<details class="eight">
+  <summary>분개의 좌우는 이 여덟 줄이 전부다</summary>
+  {% for label, combos in eight_elements() %}
+    <div class="eight-row"><b>{{ label }}</b> {{ combos|join(' · ') }}</div>
+  {% endfor %}
+</details>
+{% endif %}

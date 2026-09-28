@@ -25,6 +25,7 @@ from datetime import timedelta
 from flask import Flask, redirect, render_template, request, session, url_for
 
 import accounts
+import patterns
 from quiz import filter_questions, load_questions, round_sort_key
 
 EXAM_LABELS = {
@@ -62,6 +63,29 @@ app.secret_key = os.environ.get("SECRET_KEY") or os.urandom(24)
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=365)
 
 QUESTIONS = load_questions()
+
+@app.template_global()
+def why_side(entry_sets):
+    """분개 한 줄마다 '왜 차변인가 / 왜 대변인가'. 거래 8요소에서 자동으로 나온다."""
+    return accounts.why_side(entry_sets or [])
+
+
+@app.template_global()
+def eight_elements():
+    return accounts.EIGHT_ELEMENTS
+
+
+@app.template_global()
+def acct_code(name):
+    """KcLep에 찍어야 하는 계정과목 코드. 모르면 None (화면에는 '—'로 뜬다)."""
+    return accounts.code_of(name)
+
+
+@app.template_global()
+def acct_code_note(name):
+    """대손충당금처럼 코드가 하나로 안 정해지는 계정의 안내."""
+    return accounts.code_note(name)
+
 
 @app.template_global()
 def account_gloss(q):
@@ -465,6 +489,12 @@ def _practice_catalog(exam):
     return rounds, sections
 
 
+# 386문항을 유형(부가세 유형코드 / 결합관계)으로 묶은 교재용 목차.
+# 문항 자체는 그대로 두고 보는 순서만 바꾸는 것이라 한 번만 만들어 두면 된다.
+PATTERNS = patterns.build(PRACTICE, _section_label)
+_PAT_BY_SLUG = {g["slug"]: g for g in PATTERNS}
+
+
 def _practice_review():
     return {PRACTICE[i]["id"] for i in session.get("silmu_review", []) if i < len(PRACTICE)}
 
@@ -489,6 +519,10 @@ def silmu_start():
     exam = f.get("exam", "전산회계1급")
     if f.get("review") == "on":
         pool = [p for p in PRACTICE if p["id"] in _practice_review()]
+    elif f.get("pat"):
+        # 유형 교재에서 "이 유형만 카드로" 로 넘어온 경우
+        g = _PAT_BY_SLUG.get(f["pat"])
+        pool = [PRACTICE[i] for i in g["items"]] if g else []
     else:
         rnd = f.get("round") or ""
         sec = f.get("section") or ""
@@ -568,6 +602,38 @@ def silmu_done():
     return render_template(
         "silmu_done.html", total=len(idxs), ok=session.get("silmu_ok", 0),
         hard=hard, section_label=_section_label, left=len(_practice_review()),
+    )
+
+
+@app.route("/pattern")
+def pattern_index():
+    band = request.args.get("band") or patterns.BANDS[0]
+    if band not in patterns.BANDS:
+        band = patterns.BANDS[0]
+    return render_template(
+        "pattern_index.html", bands=patterns.BANDS, band=band,
+        groups=[g for g in PATTERNS if g["band"] == band],
+        totals={b: sum(g["count"] for g in PATTERNS if g["band"] == b)
+                for b in patterns.BANDS},
+    )
+
+
+@app.route("/pattern/<slug>")
+def pattern_page(slug):
+    g = _PAT_BY_SLUG.get(slug)
+    if not g:
+        return redirect(url_for("pattern_index"))
+    same = [x for x in PATTERNS if x["band"] == g["band"]]
+    at = same.index(g)
+    rep = g["rep"]
+    return render_template(
+        "pattern_page.html", g=g, band_groups=same,
+        prev=same[at - 1] if at else None,
+        next=same[at + 1] if at + 1 < len(same) else None,
+        items=[PRACTICE[i] for i in g["items"]],
+        section_label=_section_label,
+        combos=accounts.describe(rep["entry_sets"]) if rep else [],
+        glossary=accounts.glossary(rep["entry_sets"]) if rep else [],
     )
 
 
