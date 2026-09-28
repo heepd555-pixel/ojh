@@ -1,0 +1,28 @@
+{# 분개 한 벌을 차변/대변 두 칸으로 그린다. 실무 카드와 유형 교재가 같이 쓴다.
+   KcLep은 계정 이름이 아니라 코드를 찍어야 하므로 코드가 이름 앞에 붙는다.
+   쓰는 쪽: {% with entry_sets = ... %}{% include "_entry.html" %}{% endwith %} #}
+{% for s in entry_sets %}
+  {% if entry_sets|length > 1 %}
+    <div class="tset">{{ s.label or '분개 %d'|format(loop.index) }}</div>
+  {% endif %}
+  <div class="taccount">
+    {% for side, cls, label in [('debit', 'td', '차변'), ('credit', 'tc', '대변')] %}
+      <div class="tside {{ cls }}">
+        <div class="tlbl">{{ label }}</div>
+        {% for e in s[side] %}
+          <div class="tln">
+            <span class="tcode">{{ acct_code(e.account) or '—' }}</span><span
+              class="tacct">{{ e.account }}</span>
+            <span class="tamt">{{ "{:,}".format(e.amount) }}</span>
+            {% if e.note %}<span class="tnote">{{ e.note }}</span>{% endif %}
+            {% if acct_code_note(e.account) %}
+              <span class="tnote">{{ acct_code_note(e.account) }}</span>{% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    {% endfor %}
+  </div>
+  {% for e in s.debit + s.credit %}
+    {% if e.correction %}<p class="tfix">※ 확정답안 원문 오식 — {{ e.correction }}</p>{% endif %}
+  {% endfor %}
+{% endfor %}

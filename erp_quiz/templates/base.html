@@ -2,278 +2,242 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>{% block title %}CBT문제{% endblock %}</title>
 <style>
+  /* 색은 토큰으로만 쓴다. 아래 다크모드 블록이 이 값들만 갈아끼우면 되도록. */
   :root {
-    --ink: #22252b;
-    --ink-soft: #6b7280;
-    --paper: #f5f6f8;
+    --ink: #1c1f24;
+    --ink-soft: #71767f;
+    --ink-faint: #a2a7b0;
+    --paper: #f4f5f7;
+    --sunken: #f0f1f4;
     --card: #ffffff;
-    --accent: #3a5ba0;
-    --accent-soft: #eaf0fb;
-    --good: #1e8e5a;
-    --good-bg: #e8f7ef;
-    --bad: #c0392b;
-    --bad-bg: #fdecea;
-    --border: #e2e4e9;
+    --accent: #35529b;
+    --accent-soft: #eaeffb;
+    --good: #16794f;
+    --good-bg: #e6f5ee;
+    --bad: #b5372a;
+    --bad-bg: #fbeae7;
+    --border: #e4e6ea;
+    --hair: #eef0f3;
+    --on-accent: #ffffff;
+  }
+  /* 밤에 휴대폰으로 보는 일이 많아서 어두운 화면도 맞춰 둔다. */
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ink: #e6e8ec;
+      --ink-soft: #969ba5;
+      --ink-faint: #6b7079;
+      --paper: #16181c;
+      --sunken: #1f2228;
+      --card: #1d2026;
+      --accent: #8fabec;
+      --accent-soft: #232b3d;
+      --good: #6fcf9c;
+      --good-bg: #1b2d25;
+      --bad: #f09284;
+      --bad-bg: #32211f;
+      --border: #2b2f37;
+      --hair: #24272e;
+      --on-accent: #16181c;
+    }
   }
   * { box-sizing: border-box; }
   body {
     margin: 0;
     background: var(--paper);
     color: var(--ink);
-    font-family: -apple-system, "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
-    line-height: 1.5;
+    font-family: "Pretendard", -apple-system, "Apple SD Gothic Neo",
+                 "Malgun Gothic", system-ui, sans-serif;
+    line-height: 1.55;
+    -webkit-text-size-adjust: 100%;
   }
-  .wrap {
-    max-width: 480px;
-    margin: 0 auto;
-    padding: 20px 16px 40px;
-  }
-  h1 {
-    font-size: 1.25rem;
-    margin: 0 0 4px;
-  }
-  .sub {
-    color: var(--ink-soft);
-    font-size: 0.85rem;
-    margin: 0 0 20px;
-  }
+  .wrap { max-width: 480px; margin: 0 auto; padding: 22px 16px 48px; }
+
+  h1 { font-size: 1.3rem; font-weight: 700; letter-spacing: -0.01em; margin: 0 0 6px; }
+  .sub { color: var(--ink-soft); font-size: 0.85rem; margin: 0 0 20px; word-break: keep-all; }
+
   .card {
     background: var(--card);
     border: 1px solid var(--border);
-    border-radius: 14px;
-    padding: 18px;
-    margin-bottom: 16px;
+    border-radius: 16px;
+    padding: 18px 16px;
+    margin-bottom: 14px;
   }
-  .exam-switch {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 16px;
-  }
-  .exam-switch a {
-    flex: 1;
-    text-align: center;
-    padding: 10px;
-    border-radius: 10px;
-    background: var(--paper);
-    border: 1px solid var(--border);
-    color: var(--ink-soft);
-    font-size: 0.85rem;
-    font-weight: 600;
-    text-decoration: none;
-  }
-  .exam-switch a.active {
-    background: var(--accent);
-    border-color: var(--accent);
-    color: white;
-  }
-  label {
-    display: block;
-    font-size: 0.8rem;
-    color: var(--ink-soft);
-    margin: 14px 0 6px;
-  }
-  label:first-child { margin-top: 0; }
-  select, input[type="number"] {
-    width: 100%;
-    padding: 10px 12px;
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    font-size: 1rem;
-    background: var(--paper);
-    color: var(--ink);
-  }
-  .checkbox-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-top: 16px;
-    font-size: 0.9rem;
-  }
-  .checkbox-row input { width: 18px; height: 18px; }
-  button, .btn {
-    display: block;
-    width: 100%;
-    padding: 14px;
-    border: none;
-    border-radius: 12px;
-    background: var(--accent);
-    color: white;
-    font-size: 1rem;
-    font-weight: 600;
-    cursor: pointer;
-    text-align: center;
-    text-decoration: none;
-    margin-top: 18px;
-  }
-  button:active, .btn:active { opacity: 0.85; }
-  .btn-secondary {
-    background: var(--accent-soft);
-    color: var(--accent);
-  }
-  .progress {
-    font-family: ui-monospace, Consolas, monospace;
-    font-size: 0.8rem;
-    color: var(--ink-soft);
-    margin-bottom: 8px;
-  }
-  .badge {
-    display: inline-block;
-    font-size: 0.72rem;
-    padding: 2px 8px;
-    border-radius: 999px;
-    background: var(--accent-soft);
-    color: var(--accent);
-    margin-right: 6px;
-  }
+
+  /* 구간 이름. 전부 파랗게 소리지르면 아무것도 강조가 안 된다. */
   .q-label, .choices-label {
     display: block;
-    font-size: 0.72rem;
+    font-size: 0.7rem;
     font-weight: 700;
-    letter-spacing: 0.06em;
-    color: var(--accent);
-    margin: 14px 0 6px;
+    letter-spacing: 0.08em;
+    color: var(--ink-faint);
+    margin: 20px 0 7px;
   }
-  .q-label:first-child { margin-top: 0; }
+  .q-label:first-child, .choices-label:first-child { margin-top: 0; }
+
+  .exam-switch { display: flex; gap: 6px; margin-bottom: 16px; }
+  .exam-switch a {
+    flex: 1; text-align: center; padding: 9px 4px; border-radius: 10px;
+    background: var(--card); border: 1px solid var(--border);
+    color: var(--ink-soft); font-size: 0.82rem; font-weight: 600;
+    text-decoration: none; word-break: keep-all;
+  }
+  .exam-switch a.active {
+    background: var(--accent); border-color: var(--accent); color: var(--on-accent);
+  }
+
+  label { display: block; font-size: 0.8rem; color: var(--ink-soft); margin: 14px 0 6px; }
+  label:first-child { margin-top: 0; }
+  select, input[type="number"] {
+    width: 100%; padding: 11px 12px; border: 1px solid var(--border);
+    border-radius: 10px; font-size: 1rem; background: var(--sunken); color: var(--ink);
+  }
+  .checkbox-row { display: flex; align-items: center; gap: 8px; margin-top: 16px; font-size: 0.9rem; }
+  .checkbox-row input { width: 18px; height: 18px; accent-color: var(--accent); }
+
+  button, .btn {
+    display: block; width: 100%; padding: 14px; border: none; border-radius: 12px;
+    background: var(--accent); color: var(--on-accent); font-size: 0.98rem;
+    font-weight: 600; cursor: pointer; text-align: center; text-decoration: none;
+    margin-top: 18px; font-family: inherit;
+  }
+  button:active, .btn:active { opacity: 0.8; }
+  .btn-secondary { background: var(--accent-soft); color: var(--accent); }
+
+  .progress {
+    font-family: ui-monospace, Consolas, monospace; font-size: 0.75rem;
+    color: var(--ink-faint); margin: 0 0 10px; letter-spacing: 0.04em;
+  }
+  .badge {
+    display: inline-block; font-size: 0.7rem; padding: 3px 9px; border-radius: 999px;
+    background: var(--sunken); color: var(--ink-soft); margin: 0 5px 5px 0;
+    border: 1px solid var(--hair);
+  }
+
   .stem {
-    font-size: 1.05rem;
-    font-weight: 600;
-    line-height: 1.55;
-    margin: 0 0 16px;
-    padding: 12px 14px;
-    background: var(--accent-soft);
-    border-left: 4px solid var(--accent);
-    border-radius: 4px 10px 10px 4px;
-    white-space: pre-wrap;
+    font-size: 1.02rem; font-weight: 500; line-height: 1.65; margin: 0 0 16px;
+    padding: 14px 16px; background: var(--sunken); border-radius: 12px;
+    white-space: pre-wrap; word-break: keep-all;
   }
   .q-image {
-    display: block;
-    max-width: 100%;
-    height: auto;
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    margin: 0 0 16px;
+    display: block; max-width: 100%; height: auto;
+    border: 1px solid var(--border); border-radius: 10px; margin: 0 0 16px;
   }
-  .choices {
-    border-top: 1px dashed var(--border);
-    padding-top: 4px;
-  }
+
+  .choices { border-top: 1px solid var(--hair); padding-top: 8px; }
   .option {
-    display: block;
-    width: 100%;
-    text-align: left;
-    padding: 12px 14px;
-    margin-bottom: 10px;
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    background: var(--paper);
-    color: var(--ink);
-    font-size: 0.95rem;
-    cursor: pointer;
+    display: block; width: 100%; text-align: left; padding: 12px 14px; margin-bottom: 8px;
+    border: 1px solid var(--border); border-radius: 11px; background: var(--card);
+    color: var(--ink); font-size: 0.95rem; cursor: pointer; font-family: inherit;
+    word-break: keep-all;
   }
-  .option .num { color: var(--accent); font-weight: 700; margin-right: 6px; }
+  .option .num { color: var(--ink-faint); font-weight: 700; margin-right: 7px; }
   .option.correct { background: var(--good-bg); border-color: var(--good); }
+  .option.correct .num { color: var(--good); }
   .option.wrong { background: var(--bad-bg); border-color: var(--bad); }
-  .result-banner {
-    font-weight: 700;
-    padding: 10px 12px;
-    border-radius: 10px;
-    margin: 12px 0;
-  }
+  .option.wrong .num { color: var(--bad); }
+
+  .result-banner { font-weight: 700; padding: 11px 14px; border-radius: 11px; margin: 12px 0; }
   .result-banner.correct { background: var(--good-bg); color: var(--good); }
   .result-banner.wrong { background: var(--bad-bg); color: var(--bad); }
+
   .explanation {
-    font-size: 0.9rem;
-    color: var(--ink-soft);
-    background: var(--paper);
-    border-radius: 10px;
-    padding: 12px;
-    margin-top: 4px;
-    white-space: pre-wrap;
+    font-size: 0.89rem; color: var(--ink-soft); background: var(--sunken);
+    border-radius: 11px; padding: 13px 14px; margin-top: 4px;
+    white-space: pre-wrap; word-break: keep-all;
   }
-  .combo-row {
-    font-size: 0.92rem;
-    font-weight: 600;
-    margin: 4px 0 14px;
-  }
+
+  .combo-row { font-size: 0.92rem; font-weight: 600; margin: 4px 0 14px; }
   .combo-d { color: var(--accent); }
   .combo-c { color: var(--bad); }
-  .combo-arrow { color: var(--ink-soft); margin: 0 0.4em; font-weight: 400; }
+  .combo-arrow { color: var(--ink-faint); margin: 0 0.4em; font-weight: 400; }
   .void-badge {
-    display: inline-block;
-    font-size: 0.78rem;
-    font-weight: 700;
-    color: var(--ink-soft);
-    background: var(--paper);
-    border: 1px dashed var(--border);
-    border-radius: 999px;
-    padding: 3px 10px;
+    display: inline-block; font-size: 0.78rem; font-weight: 700; color: var(--ink-soft);
+    background: var(--sunken); border: 1px dashed var(--border);
+    border-radius: 999px; padding: 3px 10px;
   }
+
+  /* ── 차변/대변 박스. 분개연습·실무 카드·유형 교재가 모두 이걸 쓴다. ──
+     휴대폰에서 표를 여러 칸으로 쪼개면 한글이 세로로 무너진다. 그래서 좌우 두
+     칸만 두고 그 안에 코드·계정·금액을 세로로 쌓는다. */
   .taccount {
-    display: flex;
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    overflow: hidden;
-    margin-bottom: 4px;
+    display: flex; border: 1px solid var(--border); border-radius: 12px;
+    overflow: hidden; margin: 0 0 6px; background: var(--card);
   }
-  .tside {
-    flex: 1;
-    padding: 10px 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    min-width: 0;
-  }
-  .tside.td { border-right: 1px dashed var(--border); }
+  .tside { flex: 1; padding: 11px 12px; display: flex; flex-direction: column; gap: 9px; min-width: 0; }
+  .tside.td { border-right: 1px solid var(--hair); }
   .tlbl {
-    font-size: 0.66rem;
-    font-weight: 700;
-    letter-spacing: 0.05em;
-    margin-bottom: 2px;
+    font-size: 0.66rem; font-weight: 700; letter-spacing: 0.08em;
+    color: var(--ink-faint); margin-bottom: 1px;
   }
-  .tside.td .tlbl { color: var(--accent); }
-  .tside.tc .tlbl { color: var(--bad); }
-  .tln { font-size: 0.86rem; word-break: keep-all; overflow-wrap: break-word; }
-  .tln .tacct { display: block; }
-  .tln .tamt { display: block; color: var(--ink-soft); font-size: 0.8rem; font-variant-numeric: tabular-nums; }
+  .tln { font-size: 0.88rem; word-break: keep-all; overflow-wrap: break-word; }
+  .tln .tcode, .why-head .tcode, .gloss-row .tcode {
+    font-family: ui-monospace, Consolas, monospace; font-size: 0.75rem;
+    font-weight: 700; color: var(--accent); margin-right: 5px;
+  }
+  .tln .tacct { font-weight: 600; }
+  .tln .tamt {
+    display: block; color: var(--ink-soft); font-size: 0.84rem;
+    font-variant-numeric: tabular-nums; margin-top: 1px;
+  }
+  .tln .tnote { display: block; font-size: 0.74rem; color: var(--ink-faint); margin-top: 2px; }
+  .tset { font-size: 0.72rem; font-weight: 700; color: var(--ink-faint); margin: 13px 0 5px; }
+  .tfix { font-size: 0.76rem; color: var(--bad); margin: 4px 0 0; }
   .no-entry-box {
-    font-size: 0.85rem;
-    color: var(--ink-soft);
-    font-style: italic;
-    background: var(--paper);
-    border-radius: 10px;
-    padding: 12px;
-    margin-bottom: 4px;
+    font-size: 0.85rem; color: var(--ink-soft); background: var(--sunken);
+    border-radius: 11px; padding: 13px 14px; margin-bottom: 4px;
   }
-  .score-big {
-    font-size: 2.4rem;
-    font-weight: 800;
-    color: var(--accent);
-    text-align: center;
-    margin: 6px 0;
+
+  /* ── 결합관계 한 줄 ── */
+  .combo {
+    font-size: 0.95rem; font-weight: 600; color: var(--ink);
+    background: var(--sunken); border-radius: 11px;
+    padding: 11px 14px; margin-bottom: 6px; text-align: center; word-break: keep-all;
   }
-  .wrong-item {
-    padding: 10px 0;
-    border-bottom: 1px solid var(--border);
-    font-size: 0.88rem;
-  }
+
+  /* ── 왜 차변인가 / 왜 대변인가 ── */
+  .why-row { padding: 9px 0 9px 11px; border-left: 3px solid var(--hair); margin-bottom: 4px; }
+  .why-row.dr { border-left-color: var(--accent); }
+  .why-row.cr { border-left-color: var(--good); }
+  .why-head { font-size: 0.89rem; }
+  .why-head .side { font-size: 0.72rem; font-weight: 700; color: var(--ink-faint); margin-right: 6px; }
+  .why-head b { font-weight: 600; }
+  .why-text { font-size: 0.81rem; color: var(--ink-soft); margin-top: 2px; word-break: keep-all; }
+  .eight { margin-top: 12px; }
+  .eight summary { cursor: pointer; color: var(--ink-faint); font-size: 0.78rem; }
+  .eight-row { padding: 6px 0 0; font-size: 0.8rem; color: var(--ink-soft); word-break: keep-all; }
+  .eight-row b { color: var(--ink); }
+
+  .score-big { font-size: 2.4rem; font-weight: 800; color: var(--accent); text-align: center; margin: 6px 0; }
+  .wrong-item { padding: 10px 0; border-bottom: 1px solid var(--hair); font-size: 0.88rem; }
   .wrong-item:last-child { border-bottom: none; }
-  .gloss { border-top: 1px dashed var(--border); padding-top: 10px; margin-top: 4px; }
-  .gloss-row { padding: 8px 0; border-bottom: 1px solid var(--border); }
+
+  .gloss { margin-top: 2px; }
+  .gloss-row { padding: 9px 0; border-bottom: 1px solid var(--hair); }
   .gloss-row:last-child { border-bottom: none; }
-  .gloss-row b { font-size: 0.95rem; }
-  .gloss-text { font-size: 0.85rem; color: var(--ink-soft); margin-top: 3px; line-height: 1.5; }
+  .gloss-row b { font-size: 0.92rem; font-weight: 600; }
+  .gloss-text { font-size: 0.84rem; color: var(--ink-soft); margin-top: 3px; word-break: keep-all; }
   .kind {
-    font-size: 0.68rem; padding: 1px 7px; border-radius: 999px;
+    font-size: 0.66rem; padding: 2px 7px; border-radius: 999px;
     margin-left: 6px; vertical-align: 1px; font-weight: 700;
   }
-  .kind-자산, .kind-자산차감 { background: #e7f0ff; color: #2a55a8; }
-  .kind-부채 { background: #fdeee2; color: #a8551d; }
-  .kind-자본 { background: #f0e8fb; color: #6a3ea8; }
+  .kind-자산, .kind-자산차감 { background: var(--accent-soft); color: var(--accent); }
+  .kind-부채 { background: #fbeee1; color: #9c5a20; }
+  .kind-자본 { background: #f1e9fb; color: #6b45a4; }
   .kind-수익 { background: var(--good-bg); color: var(--good); }
   .kind-비용 { background: var(--bad-bg); color: var(--bad); }
+  @media (prefers-color-scheme: dark) {
+    .kind-부채 { background: #2e2519; color: #e0ab72; }
+    .kind-자본 { background: #272033; color: #bfa2e8; }
+  }
+
+  .shot {
+    display: block; width: 100%; height: auto; border: 1px solid var(--border);
+    border-radius: 11px; margin: 8px 0;
+  }
+  .shot-hint { font-size: 0.75rem; color: var(--ink-faint); margin: 12px 0 2px; }
 </style>
 </head>
 <body>

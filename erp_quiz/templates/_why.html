@@ -3,19 +3,19 @@
 {% set rows = why_side(entry_sets) %}
 {% if rows %}
 <span class="q-label">왜 이쪽인가</span>
-<div class="why">
-  {% for side, code, name, combo, rule in rows %}
-    <div class="why-row">
-      <span class="why-side {{ 'dr' if '차변' in side else 'cr' }}">{{ side }}</span>
-      <b>{{ code or '—' }} {{ name }}</b>
-      <div class="why-text">{{ combo }} — {{ rule }}</div>
+{% for side, code, name, combo, rule in rows %}
+  <div class="why-row {{ 'dr' if '차변' in side else 'cr' }}">
+    <div class="why-head">
+      <span class="side">{{ side }}</span>
+      <span class="tcode">{{ code or '—' }}</span><b>{{ name }}</b>
     </div>
-  {% endfor %}
-</div>
+    <div class="why-text">{{ combo }} — {{ rule }}</div>
+  </div>
+{% endfor %}
 <details class="eight">
   <summary>분개의 좌우는 이 여덟 줄이 전부다</summary>
   {% for label, combos in eight_elements() %}
-    <div class="eight-row"><b>{{ label }}</b> {{ combos|join(' · ') }}</div>
+    <div class="eight-row"><b>{{ label }}</b> · {{ combos|join(' · ') }}</div>
   {% endfor %}
 </details>
 {% endif %}

@@ -2,55 +2,20 @@
 {% block title %}{{ p.round }} {{ section_label }}{% endblock %}
 {% block content %}
 <style>
-  .entry { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 0.9rem; }
-  .entry th { font-size: 0.72rem; color: var(--ink-soft); text-align: left;
-              font-weight: 600; padding: 4px 8px; border-bottom: 1px solid var(--border); }
-  .entry td { padding: 7px 6px; vertical-align: top; word-break: keep-all;
-              border-bottom: 1px solid var(--border); }
-  .entry td.code { font-family: ui-monospace, Consolas, monospace; font-weight: 700;
-                   color: var(--accent); white-space: nowrap; width: 1%; }
-  .entry td.amt { text-align: right; font-family: ui-monospace, Consolas, monospace;
-                  white-space: nowrap; }
-  .entry tr:last-child td { border-bottom: none; }
-  .entry .dr { background: var(--accent-soft); }
-  .entry .cr { background: var(--good-bg); }
-  .entry .sub-note { display: block; font-size: 0.75rem; color: var(--ink-soft); }
-  .set-label { font-size: 0.75rem; font-weight: 700; color: var(--accent); margin-top: 12px; }
-  .vat { font-size: 0.85rem; background: var(--paper); border-radius: 10px;
-         padding: 10px 12px; margin: 10px 0; }
-  .vat b { color: var(--accent); }
-  .shot { display: block; width: 100%; height: auto; border: 1px solid var(--border);
-          border-radius: 8px; margin: 8px 0; }
-  .shot-hint { font-size: 0.75rem; color: var(--ink-soft); margin: 10px 0 2px; }
-  .mark-row { display: flex; gap: 10px; }
-  .mark-row button { margin-top: 14px; }
-  .mark-row .hard { background: var(--bad-bg); color: var(--bad); }
-  .fix { font-size: 0.78rem; color: var(--bad); margin-top: 6px; }
+  /* 이 화면에서만 쓰는 것들. 나머지 모양은 전부 base.html 에 있다. */
   .answer-big {
-    font-size: 1.35rem; font-weight: 800; color: var(--good);
-    background: var(--good-bg); border-radius: 10px;
-    padding: 12px 14px; margin: 10px 0; text-align: center;
-    font-family: ui-monospace, Consolas, monospace;
+    font-size: 1.3rem; font-weight: 700; color: var(--good);
+    background: var(--good-bg); border-radius: 11px;
+    padding: 13px 14px; margin: 10px 0; text-align: center;
+    font-variant-numeric: tabular-nums;
   }
-  .steps { font-size: 0.88rem; background: var(--paper); border-radius: 10px;
-           padding: 10px 12px; margin-top: 8px; }
-  .steps li { margin: 4px 0; }
-  .steps ul { margin: 0; padding-left: 18px; }
-  .why-row { padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 0.88rem; }
-  .why-row:last-child { border-bottom: none; }
-  .why-side { display: inline-block; font-size: 0.72rem; font-weight: 700;
-              padding: 2px 7px; border-radius: 6px; margin-right: 7px; }
-  .why-side.dr { background: var(--accent-soft); color: var(--accent); }
-  .why-side.cr { background: var(--good-bg); color: var(--good); }
-  .why-text { font-size: 0.8rem; color: var(--ink-soft); margin-top: 3px; }
-  .eight { margin-top: 10px; font-size: 0.8rem; color: var(--ink-soft); }
-  .eight summary { cursor: pointer; color: var(--accent); }
-  .eight-row { padding: 4px 0; }
-  .combo {
-    font-size: 0.95rem; font-weight: 700; color: var(--accent);
-    background: var(--accent-soft); border-radius: 10px;
-    padding: 10px 12px; margin-bottom: 6px; text-align: center;
-  }
+  .vat { font-size: 0.86rem; background: var(--sunken); border-radius: 11px; padding: 11px 13px; }
+  .vat b { color: var(--ink-faint); font-weight: 700; }
+  .steps { font-size: 0.88rem; background: var(--sunken); border-radius: 11px; padding: 11px 14px; }
+  .steps ul { margin: 0; padding-left: 17px; }
+  .steps li { margin: 4px 0; word-break: keep-all; }
+  .mark-row { display: flex; gap: 10px; }
+  .mark-row .hard { background: var(--bad-bg); color: var(--bad); }
 </style>
 
 <p class="progress">{{ idx }} / {{ total }}</p>
@@ -90,7 +55,6 @@
       <button type="submit">답 보기</button>
     </form>
   {% else %}
-
     {% if p.answer_text %}
       {# 장부조회처럼 답이 값 하나인 문항 #}
       <div class="answer-big">{{ p.answer_text }}</div>
@@ -104,8 +68,9 @@
       </div>
       {% if vat_kind %}
         {# 유형코드를 고르는 게 매입매출 문항의 절반이라, 왜 이 코드인지 붙인다 #}
-        <div class="gloss-row" style="border:none;padding-top:0">
-          <b>{{ vat_kind[0] }}.{{ vat_kind[1] }}</b><span class="kind kind-{{ '수익' if vat_kind[2] == '매출' else '비용' }}">{{ vat_kind[2] }}</span>
+        <div class="gloss-row">
+          <b>{{ vat_kind[0] }}.{{ vat_kind[1] }}</b><span
+            class="kind kind-{{ '수익' if vat_kind[2] == '매출' else '비용' }}">{{ vat_kind[2] }}</span>
           <div class="gloss-text">{{ vat_kind[3] }}</div>
         </div>
       {% endif %}
@@ -116,44 +81,15 @@
       {% for c in combos %}<div class="combo">{{ c }}</div>{% endfor %}
     {% endif %}
 
-    {% if p.entry_sets %}<span class="q-label">분개</span>{% endif %}
-    {% for s in p.entry_sets %}
-      {% if p.entry_sets|length > 1 %}
-        <div class="set-label">{{ s.label or '분개 %d'|format(loop.index) }}</div>
-      {% endif %}
-      <table class="entry">
-        <tr><th>코드</th><th>차변</th><th></th><th>코드</th><th>대변</th><th></th></tr>
-        {% set rows = [s.debit|length, s.credit|length]|max %}
-        {% for i in range(rows) %}
-        <tr>
-          {% if i < s.debit|length %}
-            <td class="dr code">{{ acct_code(s.debit[i].account) or '—' }}</td>
-            <td class="dr">{{ s.debit[i].account }}
-              {% if s.debit[i].note %}<span class="sub-note">{{ s.debit[i].note }}</span>{% endif %}
-              {% if acct_code_note(s.debit[i].account) %}
-                <span class="sub-note">{{ acct_code_note(s.debit[i].account) }}</span>{% endif %}</td>
-            <td class="dr amt">{{ "{:,}".format(s.debit[i].amount) }}</td>
-          {% else %}<td></td><td></td><td></td>{% endif %}
-          {% if i < s.credit|length %}
-            <td class="cr code">{{ acct_code(s.credit[i].account) or '—' }}</td>
-            <td class="cr">{{ s.credit[i].account }}
-              {% if s.credit[i].note %}<span class="sub-note">{{ s.credit[i].note }}</span>{% endif %}
-              {% if acct_code_note(s.credit[i].account) %}
-                <span class="sub-note">{{ acct_code_note(s.credit[i].account) }}</span>{% endif %}</td>
-            <td class="cr amt">{{ "{:,}".format(s.credit[i].amount) }}</td>
-          {% else %}<td></td><td></td><td></td>{% endif %}
-        </tr>
-        {% endfor %}
-      </table>
-      {% for e in s.debit + s.credit %}
-        {% if e.correction %}<p class="fix">※ 확정답안 원문 오식 — {{ e.correction }}</p>{% endif %}
-      {% endfor %}
-    {% endfor %}
-
-    {% with entry_sets = p.entry_sets %}{% include "_why.html" %}{% endwith %}
+    {% if p.entry_sets %}
+      <span class="q-label">분개</span>
+      {% with entry_sets = p.entry_sets %}{% include "_entry.html" %}{% endwith %}
+      {% with entry_sets = p.entry_sets %}{% include "_why.html" %}{% endwith %}
+    {% endif %}
 
     {% if p.notes %}
       {# 기초정보·결산처럼 '어느 메뉴에 무엇을 넣는가'가 답인 문항은 단계 목록이다 #}
+      <span class="q-label">입력 단계</span>
       <div class="steps"><ul>
         {% for n in p.notes %}<li>{{ n.lstrip('ㆍ· ') }}</li>{% endfor %}
       </ul></div>
@@ -164,7 +100,8 @@
       <div class="gloss">
         {% for name, kind, text in glossary %}
           <div class="gloss-row">
-            <b>{{ name }}</b><span class="kind kind-{{ kind }}">{{ kind }}</span>
+            <span class="tcode">{{ acct_code(name) or '—' }}</span><b>{{ name }}</b><span
+              class="kind kind-{{ kind }}">{{ kind }}</span>
             <div class="gloss-text">{{ text }}</div>
           </div>
         {% endfor %}
@@ -172,7 +109,7 @@
     {% endif %}
 
     {% if p.images %}
-      <p class="shot-hint">확정답안 KcLep 화면 {{ p.images|length }}장</p>
+      <span class="q-label">확정답안 KcLep 화면 {{ p.images|length }}장</span>
       {% for name in p.images %}
         <img class="shot" loading="lazy"
              src="{{ url_for('static', filename='official/' + name) }}" alt="정답 화면">

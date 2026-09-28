@@ -2,20 +2,25 @@
 {% block title %}유형 교재{% endblock %}
 {% block content %}
 <style>
-  .pat-row { display: block; padding: 12px 14px; margin: 8px 0; background: var(--card);
-             border: 1px solid var(--border); border-radius: 12px;
+  /* 목차는 한 줄씩 읽어 내려가는 화면이라 카드를 겹치지 않고 얇은 선으로만 나눈다. */
+  .pat-list { background: var(--card); border: 1px solid var(--border);
+              border-radius: 16px; padding: 4px 16px; }
+  .pat-row { display: block; padding: 14px 0; border-bottom: 1px solid var(--hair);
              color: inherit; text-decoration: none; }
-  .pat-row .name { font-weight: 700; font-size: 1rem; }
-  .pat-row .hint { font-size: 0.8rem; color: var(--ink-soft); margin-top: 4px;
-                   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-                   overflow: hidden; }
-  .pat-row .n { float: right; font-size: 0.78rem; color: var(--accent); font-weight: 700;
-                white-space: nowrap; margin-left: 10px; }
+  .pat-row:last-child { border-bottom: none; }
+  .pat-row .head { display: flex; align-items: baseline; gap: 10px; }
+  .pat-row .name { font-weight: 600; font-size: 0.98rem; flex: 1; word-break: keep-all; }
+  .pat-row .n { font-size: 0.74rem; color: var(--ink-faint); font-weight: 700;
+                white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .pat-row .hint { font-size: 0.8rem; color: var(--ink-soft); margin-top: 3px;
+                   word-break: keep-all;
+                   display: -webkit-box; -webkit-line-clamp: 2;
+                   -webkit-box-orient: vertical; overflow: hidden; }
 </style>
 
 <h1>유형 교재</h1>
 <p class="sub">118~126회 실무 386문항을 유형으로 묶었다. 문항을 푸는 게 아니라
-  "이 유형은 항상 이 분개"를 읽는 자료다.</p>
+  "이 유형은 항상 이 분개"를 읽는 자료다. 위에 있는 유형일수록 많이 나온다.</p>
 
 <div class="exam-switch">
   {% for b in bands %}
@@ -24,13 +29,17 @@
   {% endfor %}
 </div>
 
-{% for g in groups %}
-  <a class="pat-row" href="{{ url_for('pattern_page', slug=g.slug) }}">
-    <span class="n">{{ g.count }}문항 · {{ g.points }}점</span>
-    <div class="name">{{ g.title }}</div>
-    <div class="hint">{{ g.hint }}</div>
-  </a>
-{% endfor %}
+<div class="pat-list">
+  {% for g in groups %}
+    <a class="pat-row" href="{{ url_for('pattern_page', slug=g.slug) }}">
+      <div class="head">
+        <span class="name">{{ g.title }}</span>
+        <span class="n">{{ g.count }}문항 · {{ g.points }}점</span>
+      </div>
+      <div class="hint">{{ g.hint }}</div>
+    </a>
+  {% endfor %}
+</div>
 
 <a class="btn btn-secondary" href="{{ url_for('silmu_setup') }}">실무 카드로</a>
 {% endblock %}
