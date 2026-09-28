@@ -67,13 +67,14 @@
         {% for k, v in p.vat.items() %}<b>{{ k }}</b> {{ v }}{% if not loop.last %} · {% endif %}{% endfor %}
       </div>
       {% if vat_kind %}
-        {# 유형코드를 고르는 게 매입매출 문항의 절반이라, 왜 이 코드인지 붙인다 #}
         <div class="gloss-row">
           <b>{{ vat_kind[0] }}.{{ vat_kind[1] }}</b><span
             class="kind kind-{{ '수익' if vat_kind[2] == '매출' else '비용' }}">{{ vat_kind[2] }}</span>
           <div class="gloss-text">{{ vat_kind[3] }}</div>
         </div>
       {% endif %}
+      {# 유형코드 고르기가 매입매출 문항의 절반이라 판단 경로를 그대로 펼친다 #}
+      {% with vat = p.vat, question = p.question %}{% include "_vat.html" %}{% endwith %}
     {% endif %}
 
     {% if combos %}

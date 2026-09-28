@@ -1,0 +1,20 @@
+{# 이 거래가 왜 그 유형코드인지. 코드는 ①팔았나 샀나 ②무슨 증빙이냐 ③세금이
+   붙나 (+매입이면 ④공제되나) 로 정해지므로, 코드를 거꾸로 풀면 경로가 나온다.
+   쓰는 쪽: {% with vat = ..., question = ... %}{% include "_vat.html" %}{% endwith %} #}
+{% set steps = vat_reason(vat, question) %}
+{% if steps %}
+<span class="q-label">왜 이 유형인가</span>
+<ol class="vsteps">
+  {% for label, answer, evidence in steps %}
+    <li>
+      <span class="vq">{{ label[1:] }}</span>
+      <b>{{ answer }}</b>
+      {% if evidence %}<span class="vwhy">{{ evidence }}</span>{% endif %}
+    </li>
+  {% endfor %}
+</ol>
+{% set pair = vat_confused(vat) %}
+{% if pair %}
+  <div class="vpair"><b>{{ pair[0] }}</b>와 헷갈린다 — {{ pair[1] }}</div>
+{% endif %}
+{% endif %}

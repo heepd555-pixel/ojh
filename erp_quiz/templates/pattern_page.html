@@ -28,6 +28,13 @@
   <p class="sub" style="margin-bottom:12px">{{ g.hint }}</p>
   {% for e in g.exams %}<span class="badge">{{ e }}</span>{% endfor %}
 
+  {% if g.rep and g.rep.vat %}
+    {# 매입매출 유형은 '왜 이 코드인가'가 곧 이 페이지의 본론이다 #}
+    {% with vat = g.rep.vat, question = g.rep.question %}
+      {% include "_vat.html" %}
+    {% endwith %}
+  {% endif %}
+
   {% if g.rep %}
     {% if combos %}
       <span class="q-label">결합관계 — 무엇이 늘고 줄었나</span>

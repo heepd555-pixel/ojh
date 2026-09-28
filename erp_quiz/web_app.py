@@ -65,6 +65,18 @@ app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=365)
 QUESTIONS = load_questions()
 
 @app.template_global()
+def vat_reason(vat, question=""):
+    """이 거래가 왜 그 유형코드인지 — 판단 경로. 유형코드 구조에서 나온다."""
+    return accounts.vat_reason(vat, question)
+
+
+@app.template_global()
+def vat_confused(vat):
+    """이 유형과 헷갈리는 짝, 그리고 둘을 가르는 기준."""
+    return accounts.vat_confused(vat)
+
+
+@app.template_global()
 def why_side(entry_sets):
     """분개 한 줄마다 '왜 차변인가 / 왜 대변인가'. 거래 8요소에서 자동으로 나온다."""
     return accounts.why_side(entry_sets or [])

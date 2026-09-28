@@ -190,6 +190,31 @@
     border-radius: 11px; padding: 13px 14px; margin-bottom: 4px;
   }
 
+  /* ── 왜 이 유형코드인가 (매입매출) ── */
+  .vsteps { list-style: none; counter-reset: v; margin: 0; padding: 0; }
+  .vsteps li {
+    counter-increment: v; position: relative;
+    padding: 9px 0 9px 26px; border-bottom: 1px solid var(--hair);
+  }
+  .vsteps li:last-child { border-bottom: none; }
+  .vsteps li::before {
+    content: counter(v); position: absolute; left: 0; top: 10px;
+    width: 17px; height: 17px; border-radius: 999px;
+    background: var(--accent-soft); color: var(--accent);
+    font-size: 0.66rem; font-weight: 700; line-height: 17px; text-align: center;
+  }
+  .vsteps .vq { font-size: 0.72rem; color: var(--ink-faint); font-weight: 700; margin-right: 7px; }
+  .vsteps b { font-size: 0.9rem; font-weight: 600; }
+  .vsteps .vwhy {
+    display: block; font-size: 0.8rem; color: var(--ink-soft);
+    margin-top: 2px; word-break: keep-all;
+  }
+  .vpair {
+    font-size: 0.82rem; color: var(--ink-soft); background: var(--sunken);
+    border-radius: 11px; padding: 10px 13px; margin-top: 10px; word-break: keep-all;
+  }
+  .vpair b { color: var(--ink); }
+
   /* ── 결합관계 한 줄 ── */
   .combo {
     font-size: 0.95rem; font-weight: 600; color: var(--ink);
