@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ idx }}/{{ total }} - 시험모드{% endblock %}
 {% block content %}
-  <div class="progress">시험모드 · {{ idx }} / {{ total }}</div>
+  <div class="progress">시험모드 · {{ idx }} / {{ total }}{% if left is not none %} · <span id="timer" data-left="{{ left }}">--:--</span>{% endif %}</div>
   <div class="card">
     <span class="badge">{{ q.subject }}{{ q.level }}</span>
     <span class="badge">{{ q.round }}</span>
@@ -26,4 +26,20 @@
       {% endfor %}
     </form>
   </div>
+{% if left is not none %}
+<script>
+(function () {
+  var el = document.getElementById("timer");
+  var end = Date.now() + parseInt(el.dataset.left, 10) * 1000;
+  function tick() {
+    var s = Math.max(0, Math.round((end - Date.now()) / 1000));
+    el.textContent = Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+    if (s <= 60) el.style.color = "var(--bad)";
+    if (s === 0) { location.href = "{{ url_for('exam_result') }}"; return; }
+    setTimeout(tick, 500);
+  }
+  tick();
+})();
+</script>
+{% endif %}
 {% endblock %}

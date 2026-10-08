@@ -9,7 +9,7 @@
 
   {% if wrong_qs %}
     <div class="card">
-      <p class="sub" style="margin-top:0;">틀린 문제 ({{ wrong_qs|length }}개) -- 오답노트에 저장됨</p>
+      <p class="sub" style="margin-top:0;">틀린 문제 ({{ wrong_qs|length }}개) -- 오늘 복습 대상에 담김</p>
       {% for q in wrong_qs %}
         <div class="wrong-item">
           <span class="badge">{{ q.subject }}{{ q.level }}</span>{{ q.stem[:60] }}...
@@ -19,4 +19,5 @@
   {% endif %}
 
   <a class="btn" href="{{ url_for('setup') }}">다시 시작</a>
+  <a class="btn btn-secondary" href="{{ url_for('stats') }}">📊 약점·복습 현황</a>
 {% endblock %}

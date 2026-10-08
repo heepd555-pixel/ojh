@@ -12,7 +12,7 @@
 
   <form method="post" action="{{ url_for('exam_start') }}" class="card">
     <input type="hidden" name="exam" value="{{ exam }}">
-    <label>이름 (오답노트 구분용)</label>
+    <label>이름 (학습 기록 구분용)</label>
     <input type="text" name="name" value="{{ name }}" required placeholder="예: 홍길동">
 
     <label>과목/급수</label>
@@ -28,6 +28,10 @@
         <option value="{{ s.value }}" {% if s.is_year %}style="font-weight:700;"{% endif %}>{{ s.label }}</option>
       {% endfor %}
     </select>
+
+    <label>제한 시간 (분, 0 = 시간 제한 없음)</label>
+    <input type="number" name="minutes" value="20" min="0" max="180">
+    <p class="sub" style="margin:6px 0 0;">기본 20분은 임의로 잡은 값이에요. 실제 시험은 이론+실무가 한 시간(회계1급 60분 · 세무2급 90분)에 묶여 있으니 연습하면서 조정하세요.</p>
 
     <button type="submit">시험 시작</button>
   </form>

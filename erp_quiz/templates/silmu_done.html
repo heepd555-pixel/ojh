@@ -18,8 +18,9 @@
 </div>
 
 {% if left %}
-<a class="btn" href="{{ url_for('silmu_setup') }}">헷갈린 것만 다시 ({{ left }}장)</a>
+<a class="btn" href="{{ url_for('silmu_setup') }}">오늘 복습할 카드 ({{ left }}장)</a>
 {% endif %}
 <a class="btn btn-secondary" href="{{ url_for('silmu_setup') }}">다른 범위 고르기</a>
+<a class="btn btn-secondary" href="{{ url_for('stats') }}">📊 약점·복습 현황</a>
 <a class="btn btn-secondary" href="{{ url_for('setup') }}">이론 문제로</a>
 {% endblock %}

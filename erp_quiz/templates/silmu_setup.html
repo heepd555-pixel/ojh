@@ -14,6 +14,9 @@
 <form method="post" action="{{ url_for('silmu_start') }}">
   <input type="hidden" name="exam" value="{{ exam }}">
   <div class="card">
+    <label>이름 (학습 기록 구분용 · 이론 문제와 같은 이름을 쓰세요)</label>
+    <input type="text" name="name" value="{{ name }}" placeholder="예: 홍길동">
+
     <label>회차</label>
     <select name="round">
       <option value="">전체 ({{ total }}문항)</option>
@@ -37,7 +40,7 @@
     {% if hard_count %}
     <div class="checkbox-row">
       <input type="checkbox" name="review" id="review">
-      <label for="review" style="margin:0">헷갈린 것만 ({{ hard_count }}장)</label>
+      <label for="review" style="margin:0">오늘 복습할 카드만 ({{ hard_count }}장 · 헷갈렸던 것 + 복습 시기가 된 것)</label>
     </div>
     {% endif %}
 
@@ -46,5 +49,6 @@
 </form>
 
 <a class="btn" href="{{ url_for('pattern_index') }}">유형 교재로 보기 (유형별로 묶어서 읽기)</a>
+<a class="btn btn-secondary" href="{{ url_for('stats', exam=exam) }}">📊 약점·복습 현황</a>
 <a class="btn btn-secondary" href="{{ url_for('setup') }}">이론 문제로</a>
 {% endblock %}

@@ -5,6 +5,8 @@
   <div class="card">
     <div class="score-big">{{ score }} / {{ total }}</div>
     <p class="sub" style="text-align:center;">정답률 {{ pct }}%</p>
+    {% if timed_out %}<p class="sub" style="text-align:center;">⏰ 시간이 끝나 안 푼 문제는 오답으로 처리했어요.</p>{% endif %}
+    <div class="result-banner {{ 'correct' if passed else 'wrong' }}">{{ ('합격 기준 ' ~ pass_pct ~ '% 이상 · 통과') if passed else ('합격 기준 ' ~ pass_pct ~ '%에 못 미침') }}</div>
   </div>
 
   {% for row in rows %}

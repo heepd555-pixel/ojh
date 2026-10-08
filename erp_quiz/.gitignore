@@ -12,3 +12,6 @@ __pycache__/
 build/
 dist/
 *.spec
+
+# 서버에 저장되는 학습 기록 (store.py)
+data/

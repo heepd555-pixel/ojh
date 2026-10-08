@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}약점·복습 현황{% endblock %}
+{% block content %}
+  <h1>📊 약점·복습 현황</h1>
+  <p class="sub">{{ name or "이름 없음(guest)" }} 님의 기록 · 틀린 문제는 바로, 맞힌 문제는 1·3·7·14·30일 뒤에 복습 대상으로 돌아와요.</p>
+
+  <div class="exam-switch">
+    {% for key, label in exam_labels.items() %}
+      <a href="{{ url_for('stats', exam=key) }}" class="{% if key == exam %}active{% endif %}">{{ label }}</a>
+    {% endfor %}
+  </div>
+
+  <div class="card">
+    <span class="q-label" style="margin-top:0;">오늘 복습할 것</span>
+    <p style="margin:6px 0 12px;">이론 <b>{{ theory_total.due }}</b>문제 · 실무 카드 <b>{{ silmu_total.due }}</b>장</p>
+    {% if theory_total.due %}
+      <form method="post" action="{{ url_for('start') }}">
+        <input type="hidden" name="exam" value="{{ exam }}">
+        <input type="hidden" name="name" value="{{ name or 'guest' }}">
+        <input type="hidden" name="review" value="on">
+        <input type="hidden" name="count" value="30">
+        <button type="submit">이론 복습 시작</button>
+      </form>
+    {% endif %}
+    {% if silmu_total.due %}
+      <a class="btn" href="{{ url_for('silmu_start', exam=exam, review='on', shuffle='on', count=30) }}">실무 카드 복습 시작</a>
+    {% endif %}
+    {% if not theory_total.due and not silmu_total.due %}
+      <p class="sub" style="margin:0;">지금은 복습할 게 없어요.</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <span class="q-label" style="margin-top:0;">실무 · 유형별 (정답률 낮은 순)</span>
+    <p class="sub" style="margin:4px 0 10px;">푼 카드 {{ silmu_total.tried }} / {{ silmu_pool }}장 · 누적 정답률 {{ silmu_total.pct }}%</p>
+    {% for r in silmu_rows %}
+      <div class="wrong-item">
+        <b>{{ r.grp or "기타" }}</b> — {{ r.pct }}% ({{ r.right }}맞음 · {{ r.wrong }}틀림)
+        {% if r.due %}<span class="badge">복습 {{ r.due }}</span>{% endif %}
+        <div style="height:6px;border-radius:3px;background:var(--sunken);margin-top:4px;">
+          <div style="height:6px;border-radius:3px;width:{{ r.pct }}%;background:{{ 'var(--good)' if r.pct >= 70 else 'var(--bad)' }};"></div>
+        </div>
+      </div>
+    {% else %}
+      <p class="sub" style="margin:0;">아직 푼 실무 카드가 없어요.</p>
+    {% endfor %}
+  </div>
+
+  <div class="card">
+    <span class="q-label" style="margin-top:0;">이론 · 회차별</span>
+    <p class="sub" style="margin:4px 0 10px;">푼 문제 {{ theory_total.tried }} / {{ theory_pool }}문제 · 누적 정답률 {{ theory_total.pct }}%</p>
+    {% for r in theory_rows %}
+      <div class="wrong-item">
+        <b>{{ r.grp }}</b> — {{ r.pct }}% ({{ r.right }}맞음 · {{ r.wrong }}틀림)
+        {% if r.due %}<span class="badge">복습 {{ r.due }}</span>{% endif %}
+      </div>
+    {% else %}
+      <p class="sub" style="margin:0;">아직 푼 이론 문제가 없어요.</p>
+    {% endfor %}
+  </div>
+
+  <a class="btn btn-secondary" href="{{ url_for('setup', exam=exam) }}">← 이론 문제로</a>
+  <a class="btn btn-secondary" href="{{ url_for('silmu_setup', exam=exam) }}">실무 카드로</a>
+{% endblock %}

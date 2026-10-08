@@ -20,23 +20,24 @@ import os
 import random
 import re
 import socket
+import time
 from datetime import timedelta
 
 from flask import Flask, redirect, render_template, request, session, url_for
 
 import accounts
 import patterns
+import store
 from quiz import filter_questions, load_questions, round_sort_key
 
+# 화면에 노출할 시험. 전산회계1급·전산세무2급만 쓴다.
+# (ERP/FAT/TAT/분개연습 데이터는 questions.json 에 그대로 있고, 다시 쓰려면
+#  아래 딕셔너리에 한 줄 추가하면 된다.)
 EXAM_LABELS = {
-    "erp": "ERP 정보관리사",
     "전산회계1급": "전산회계1급",
-    "FAT1급": "FAT1급",
     "전산세무2급": "전산세무2급",
-    "TAT2급": "TAT2급",
-    "분개연습": "분개연습",
 }
-DEFAULT_EXAM = "erp"
+DEFAULT_EXAM = "전산회계1급"
 _YEAR_MONTH_ROUND_EXAMS = {"erp", "ERP실기"}
 
 
@@ -109,26 +110,32 @@ def account_gloss(q):
 
 TYPE_LABEL = {"theory": "이론", "bunkae": "분개연습", "practical": "실기"}
 
-# 오답노트를 문제 id(긴 문자열) 그대로 쿠키에 쌓으면 금방 브라우저 쿠키 용량
-# 한도(약 4KB)를 넘어서 조용히 통째로 날아갈 수 있다. QUESTIONS 안에서의
-# 정수 인덱스로 바꿔서 저장하면 훨씬 압축되어 안전하다.
-_ID_TO_INDEX = {q["id"]: i for i, q in enumerate(QUESTIONS)}
+def _user():
+    """기록을 구분하는 이름. 입력한 적이 없으면 'guest'."""
+    return store.norm(session.get("name"))
 
 
-def _get_review_ids():
-    """세션 쿠키에 저장된 오답노트(정수 인덱스)를 문제 id 집합으로 변환."""
-    idxs = session.get("wrong_review", [])
-    ids = set()
-    for i in idxs:
-        if 0 <= i < len(QUESTIONS):
-            ids.add(QUESTIONS[i]["id"])
-    return ids
+def _migrate_cookie_notes():
+    """예전 버전이 쿠키에 쌓아 둔 오답노트를 서버 기록으로 한 번 옮긴다."""
+    old_theory = session.pop("wrong_review", None)
+    old_silmu = session.pop("silmu_review", None)
+    if old_theory:
+        store.import_wrong(_user(), "theory", [
+            (QUESTIONS[i]["id"], QUESTIONS[i].get("exam", "erp"), QUESTIONS[i]["round"])
+            for i in old_theory if 0 <= i < len(QUESTIONS)])
+    if old_silmu:
+        store.import_wrong(_user(), "silmu", [
+            (PRACTICE[i]["id"], PRACTICE[i]["exam"], _PAT_OF.get(PRACTICE[i]["id"], ""))
+            for i in old_silmu if 0 <= i < len(PRACTICE)])
 
 
-def _set_review_ids(ids):
-    idxs = sorted(_ID_TO_INDEX[i] for i in ids if i in _ID_TO_INDEX)
-    session["wrong_review"] = idxs
-    session.permanent = True
+def _theory_due(exam):
+    """오늘 복습할 이론 문항 id (틀린 문제 + 복습 시기가 된 문제)."""
+    return store.due_ids(_user(), "theory", exam)
+
+
+def _record_theory(q, ok):
+    store.record(_user(), "theory", q["id"], q.get("exam", "erp"), q["round"], ok)
 
 
 class _Args:
@@ -148,6 +155,7 @@ def _pick_exam(form_or_args):
     return exam
 
 
+PASS_PCT = 70  # 합격 기준(참고용): 100점 만점에 70점 이상
 LEVEL_ORDER = ["하", "중", "상"]
 
 
@@ -181,7 +189,8 @@ def setup():
     exam = _pick_exam(request.args)
     subjects, levels, rounds, combos = _catalog(exam)
     name = session.get("name", "")
-    wrong_count = len(_get_review_ids())
+    _migrate_cookie_notes()
+    wrong_count = len(_theory_due(exam))
     return render_template(
         "setup.html", subjects=subjects, levels=levels, rounds=rounds, combos=combos,
         wrong_count=wrong_count, name=name,
@@ -265,10 +274,23 @@ def exam_start():
     ]
     pool.sort(key=lambda q: (_round_key(exam, q["round"]), q["num"]))
 
+    try:
+        minutes = max(0, int(request.form.get("minutes") or 0))
+    except ValueError:
+        minutes = 0
+
     session["exam_ids"] = [q["id"] for q in pool]
     session["exam_idx"] = 0
     session["exam_answers"] = {}
+    session["exam_recorded"] = False
+    session["exam_deadline"] = int(time.time()) + minutes * 60 if minutes else 0
     return redirect(url_for("exam_quiz"))
+
+
+def _exam_left():
+    """시험 남은 초. 시간제한이 없으면 None, 지났으면 0."""
+    deadline = session.get("exam_deadline", 0)
+    return None if not deadline else max(0, deadline - int(time.time()))
 
 
 @app.route("/exam/quiz")
@@ -278,13 +300,14 @@ def exam_quiz():
         return redirect(url_for("exam_setup"))
 
     idx = session.get("exam_idx", 0)
-    if idx >= len(ids):
+    left = _exam_left()
+    if idx >= len(ids) or left == 0:
         return redirect(url_for("exam_result"))
 
     q = _question_by_id(ids[idx])
     return render_template(
         "exam_quiz.html", q=q, idx=idx + 1, total=len(ids),
-        is_last=(idx + 1 == len(ids)),
+        is_last=(idx + 1 == len(ids)), left=left,
     )
 
 
@@ -294,6 +317,9 @@ def exam_answer():
     idx = session.get("exam_idx", 0)
     if not ids or idx >= len(ids):
         return redirect(url_for("exam_setup"))
+
+    if _exam_left() == 0:  # 시간이 끝난 뒤 들어온 답은 받지 않는다
+        return redirect(url_for("exam_result"))
 
     qid = ids[idx]
     selected = request.form.get("choice")
@@ -324,14 +350,18 @@ def exam_result():
             wrong_ids.append(qid)
         rows.append({"q": q, "selected": selected, "correct": correct})
 
-    if ids:
-        existing = _get_review_ids()
-        existing.update(wrong_ids)
-        existing.difference_update(i for i in ids if i not in wrong_ids)
-        _set_review_ids(existing)
+    # 결과 화면은 새로고침해도 다시 열리므로, 기록은 시험 한 번에 한 번만 남긴다.
+    if not session.get("exam_recorded"):
+        for row in rows:
+            _record_theory(row["q"], row["correct"])
+        session["exam_recorded"] = True
 
     pct = round(score / len(ids) * 100) if ids else 0
-    return render_template("exam_result.html", rows=rows, score=score, total=len(ids), pct=pct)
+    return render_template(
+        "exam_result.html", rows=rows, score=score, total=len(ids), pct=pct,
+        passed=pct >= PASS_PCT, pass_pct=PASS_PCT,
+        timed_out=_exam_left() == 0,
+    )
 
 
 @app.route("/start", methods=["POST"])
@@ -348,8 +378,8 @@ def start():
     count = int(request.form.get("count") or 20)
 
     if review:
-        wrong_ids = _get_review_ids()
-        pool = [q for q in exam_qs if q["id"] in wrong_ids and q.get("answer")]
+        due = _theory_due(exam)
+        pool = [q for q in exam_qs if q["id"] in due and q.get("answer")]
     else:
         args = _Args(
             request.form.get("subject"), request.form.get("level"), request.form.get("round"),
@@ -416,7 +446,10 @@ def answer():
     selected = request.form.get("choice")
     session["selected"] = selected
     session["revealed"] = True
-    if is_correct(selected, q["answer"]):
+    ok = is_correct(selected, q["answer"])
+    if q.get("answer"):  # 정답이 없는 문항은 채점 대상이 아니라 기록하지 않는다
+        _record_theory(q, ok)
+    if ok:
         session["score"] = session.get("score", 0) + 1
     else:
         session["wrong_ids"] = session.get("wrong_ids", []) + [q["id"]]
@@ -438,13 +471,6 @@ def summary():
     wrong_ids = session.get("wrong_ids", [])
     attempted = score + len(wrong_ids)
     wrong_qs = [_question_by_id(i) for i in wrong_ids]
-
-    if attempted:
-        existing = _get_review_ids()
-        existing.update(wrong_ids)
-        correct_ids = [i for i in ids[:attempted] if i not in wrong_ids]
-        existing.difference_update(correct_ids)
-        _set_review_ids(existing)
 
     pct = round(score / attempted * 100) if attempted else 0
     return render_template(
@@ -507,8 +533,13 @@ PATTERNS = patterns.build(PRACTICE, _section_label)
 _PAT_BY_SLUG = {g["slug"]: g for g in PATTERNS}
 
 
+# 문항 id -> 유형 이름(통계 묶음). 약점 화면이 "어떤 유형을 자주 틀리나"를 보여준다.
+_PAT_OF = {PRACTICE[i]["id"]: g["title"] for g in PATTERNS for i in g["items"]}
+
+
 def _practice_review():
-    return {PRACTICE[i]["id"] for i in session.get("silmu_review", []) if i < len(PRACTICE)}
+    """오늘 복습할 실무 카드 id (헷갈렸던 것 + 복습 시기가 된 것)."""
+    return store.due_ids(_user(), "silmu")
 
 
 @app.route("/silmu")
@@ -516,10 +547,11 @@ def silmu_setup():
     exam = request.args.get("exam")
     if exam not in ("전산회계1급", "전산세무2급"):
         exam = "전산회계1급"
+    _migrate_cookie_notes()
     rounds, sections = _practice_catalog(exam)
     return render_template(
         "silmu_setup.html", exam=exam, rounds=rounds, sections=sections,
-        hard_count=len(_practice_review()), total=len([p for p in PRACTICE if p["exam"] == exam]),
+        hard_count=len(_practice_review()), name=session.get("name", ""), total=len([p for p in PRACTICE if p["exam"] == exam]),
     )
 
 
@@ -528,6 +560,9 @@ def silmu_start():
     """GET도 받는다: /silmu/start?exam=전산세무2급&section=문제2 처럼 특정 묶음을
     바로 열 수 있어 휴대폰에 북마크해 두고 쓸 수 있다."""
     f = request.values
+    if f.get("name", "").strip():
+        session["name"] = f["name"].strip()
+        session.permanent = True
     exam = f.get("exam", "전산회계1급")
     if f.get("review") == "on":
         pool = [p for p in PRACTICE if p["id"] in _practice_review()]
@@ -594,14 +629,13 @@ def silmu_mark():
     idxs = session.get("silmu_ids") or []
     i = session.get("silmu_idx", 0)
     if i < len(idxs):
-        review = set(session.get("silmu_review", []))
-        if request.form.get("how") == "hard":
-            review.add(idxs[i])
+        p = PRACTICE[idxs[i]]
+        hard = request.form.get("how") == "hard"
+        store.record(_user(), "silmu", p["id"], p["exam"], _PAT_OF.get(p["id"], ""), not hard)
+        if hard:
             session["silmu_hard"] = session.get("silmu_hard", []) + [idxs[i]]
         else:
-            review.discard(idxs[i])
             session["silmu_ok"] = session.get("silmu_ok", 0) + 1
-        session["silmu_review"] = sorted(review)
     session["silmu_idx"] = i + 1
     session["silmu_reveal"] = False
     return redirect(url_for("silmu_card"))
@@ -614,6 +648,31 @@ def silmu_done():
     return render_template(
         "silmu_done.html", total=len(idxs), ok=session.get("silmu_ok", 0),
         hard=hard, section_label=_section_label, left=len(_practice_review()),
+    )
+
+
+@app.route("/stats")
+def stats():
+    """약점 화면: 어디서 자주 틀리는지, 오늘 복습할 게 얼마나 되는지."""
+    exam = _pick_exam(request.args)
+    _migrate_cookie_notes()
+    user = _user()
+    silmu_rows = store.stats(user, "silmu", exam)
+    silmu_rows.sort(key=lambda r: (r["pct"], -r["wrong"]))  # 정답률 낮은 유형이 위로
+    theory_rows = store.stats(user, "theory", exam)
+    theory_rows.sort(key=lambda r: _round_key(exam, r["grp"]), reverse=True)
+
+    def total(rows):
+        ok, bad = sum(r["right"] for r in rows), sum(r["wrong"] for r in rows)
+        return {"right": ok, "wrong": bad, "pct": round(ok / (ok + bad) * 100) if ok + bad else 0,
+                "due": sum(r["due"] for r in rows), "tried": sum(r["tried"] for r in rows)}
+
+    return render_template(
+        "stats.html", exam=exam, exam_labels=EXAM_LABELS, name=session.get("name", ""),
+        silmu_rows=silmu_rows, theory_rows=theory_rows,
+        silmu_total=total(silmu_rows), theory_total=total(theory_rows),
+        theory_pool=len([q for q in QUESTIONS if q.get("exam", "erp") == exam and q.get("answer")]),
+        silmu_pool=len([p for p in PRACTICE if p["exam"] == exam]),
     )
 
 
