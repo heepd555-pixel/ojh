@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}실기 시험 시뮬레이션{% endblock %}
+{% block content %}
+<h1>🏁 실기 시험 시뮬레이션</h1>
+<p class="sub">회차 하나를 실제 시험처럼 풀어요. 이론(객관식) 30점 + 실무 70점, 합격 기준은 70점 이상이에요. 정답은 제출한 뒤에야 보여요.</p>
+
+<div class="exam-switch">
+  {% for key in ['전산회계1급', '전산세무2급'] %}
+    <a href="{{ url_for('sim_setup', exam=key) }}" class="{{ 'active' if key == exam }}">{{ key }}</a>
+  {% endfor %}
+</div>
+
+<form method="post" action="{{ url_for('sim_start') }}" class="card">
+  <input type="hidden" name="exam" value="{{ exam }}">
+  <label>이름 (학습 기록 구분용)</label>
+  <input type="text" name="name" value="{{ name }}" placeholder="예: 홍길동">
+
+  <label>회차</label>
+  <select name="round">
+    {% for r, nt in rounds %}<option value="{{ r }}">{{ r }} — 이론 {{ nt }}문항 + 실무</option>{% endfor %}
+  </select>
+
+  <label>제한 시간 (분, 0 = 없음)</label>
+  <input type="number" name="minutes" value="{{ minutes }}" min="0" max="240">
+  <p class="sub" style="margin:6px 0 0;">실제 시험 시간({{ minutes }}분)을 기본으로 해뒀어요.</p>
+  <button type="submit">시험 시작</button>
+</form>
+<p class="sub">· 이론 문제가 15개 미만인 회차는 이론 30점을 문항 수로 나눠 환산해요.<br>
+· 기초정보·장부조회·부가세신고·원천징수처럼 KcLep 화면이 답인 문항은 자동 채점이 안 돼서, 제출 후 정답 화면을 보고 직접 맞았는지 체크해요.</p>
+<a class="btn btn-secondary" href="{{ url_for('lab_setup', exam=exam) }}">⌨️ 전표 입력 연습</a>
+{% endblock %}

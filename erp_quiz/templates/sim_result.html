@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}시험 결과{% endblock %}
+{% block content %}
+<h1>시험 결과</h1>
+<p class="sub">{{ state.exam }} {{ state.round }}{% if timed_out %} · ⏰ 시간 종료로 제출됨{% endif %}</p>
+<div class="card">
+  <div class="score-big">{{ '%.1f' % total }} / 100</div>
+  <div class="result-banner {{ 'correct' if total >= 70 else 'wrong' }}">
+    {{ '합격 기준 70점 이상 · 통과' if total >= 70 else '합격 기준 70점에 못 미침 (' ~ ('%.1f' % (70 - total)) ~ '점 부족)' }}
+  </div>
+  <p class="sub" style="margin:0;">이론 {{ '%.1f' % theory_pts }} / 30 · 실무 {{ '%.1f' % prac_pts }} / 70
+    {% if self_pending %}· 자가채점 대기 {{ self_pending }}문항 ({{ '%g' % self_pending_pts }}점){% endif %}</p>
+  {% if time_used %}<p class="sub" style="margin:4px 0 0;">걸린 시간 {{ time_used }}</p>{% endif %}
+</div>
+
+{% if by_section %}
+<div class="card">
+  <span class="q-label" style="margin-top:0;">유형별 득점</span>
+  {% for label, got, mx in by_section %}
+    <div class="wrong-item"><b>{{ label }}</b> — {{ '%.1f' % got }} / {{ '%g' % mx }}점</div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<form method="post" action="{{ url_for('sim_selfmark') }}">
+{% for row in rows %}
+  <div class="card" id="q{{ loop.index }}">
+    <span class="badge">{{ loop.index }}번</span>
+    <span class="badge">{{ '이론' if row.item.k == 't' else row.label }}</span>
+    <span class="badge">{{ '%.1f' % row.earned }} / {{ '%g' % row.max }}점</span>
+
+    {% if row.item.k == 't' %}
+      <div class="stem" style="margin-top:8px;">{{ row.q.stem }}</div>
+      <div class="choices">
+        {% for num in ["1","2","3","4"] %}
+          <div class="option {% if num in row.q.answer.split(',') %}correct{% elif num == row.chosen %}wrong{% endif %}">
+            <span class="num">{{ num }}</span>{{ row.q.options.get(num, "") }}</div>
+        {% endfor %}
+      </div>
+      {% if not row.chosen %}<div class="result-banner wrong">답을 고르지 않았어요 — 정답 {{ row.q.answer }}번</div>{% endif %}
+      {% if row.q.explanation %}<div class="explanation">{{ row.q.explanation }}</div>{% endif %}
+    {% else %}
+      {% with p = row.p %}{% include "_q_prompt.html" %}{% endwith %}
+      {% if row.r %}
+        {% with r = row.r, p = row.p %}{% include "_lab_result.html" %}{% endwith %}
+      {% else %}
+        {% if row.memo %}<span class="q-label">내 메모</span><div class="explanation">{{ row.memo }}</div>{% endif %}
+        {% if row.p.answer_text %}<div class="result-banner correct">{{ row.p.answer_text }}</div>{% endif %}
+        {% if row.p.notes %}
+          <div class="steps"><ul>{% for n in row.p.notes %}<li>{{ n.lstrip('ㆍ· ') }}</li>{% endfor %}</ul></div>
+        {% endif %}
+        {% for name in row.p.images %}
+          <img class="shot" loading="lazy" src="{{ url_for('static', filename='official/' + name) }}" alt="정답 화면">
+        {% endfor %}
+        <div class="checkbox-row">
+          <input type="checkbox" name="ok" value="{{ row.index }}" id="ok{{ row.index }}" {% if row.self_ok %}checked{% endif %}>
+          <label for="ok{{ row.index }}" style="margin:0;">내 입력이 정답과 같았음 (+{{ '%g' % row.max }}점)</label>
+        </div>
+      {% endif %}
+    {% endif %}
+  </div>
+{% endfor %}
+{% if self_total %}<button type="submit">자가채점 반영하기</button>{% endif %}
+</form>
+<a class="btn" href="{{ url_for('sim_setup', exam=state.exam) }}">다른 회차 풀기</a>
+<a class="btn btn-secondary" href="{{ url_for('stats', exam=state.exam) }}">📊 약점·복습 현황</a>
+{% endblock %}

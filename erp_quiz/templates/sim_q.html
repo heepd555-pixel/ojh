@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}{{ i + 1 }}/{{ total }} 시험{% endblock %}
+{% block content %}
+<style>
+  .sim-top { position: sticky; top: 0; z-index: 5; background: var(--paper); padding: 8px 0; }
+  .sim-nav { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+  .sim-nav button { width: 34px; padding: 6px 0; font-size: 0.8rem; background: var(--sunken); color: var(--ink-soft); }
+  .sim-nav button.done { background: var(--accent-soft); color: var(--accent); }
+  .sim-nav button.cur { background: var(--accent); color: var(--on-accent); }
+  .row2 { display: flex; gap: 10px; }
+</style>
+<form method="post" action="{{ url_for('sim_save', i=i) }}" id="simform">
+  <div class="sim-top">
+    <div class="progress">{{ state.exam }} {{ state.round }} · {{ i + 1 }} / {{ total }}
+      {% if left is not none %} · <span id="timer" data-left="{{ left }}">--:--</span>{% endif %}</div>
+    <div class="sim-nav">
+      {% for j in range(total) %}
+        <button type="submit" name="to" value="{{ j }}"
+                class="{{ 'cur' if j == i else ('done' if answered[j] else '') }}">{{ j + 1 }}</button>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="card">
+    {% if item.k == 't' %}
+      <span class="badge">이론</span><span class="badge">{{ '%g' % tpoints }}점</span>
+      <span class="q-label">문제</span>
+      <div class="stem">{{ q.stem }}</div>
+      {% if q.image %}<img class="q-image" src="{{ url_for('static', filename=q.image) }}" alt="문제 첨부 이미지">{% endif %}
+      <span class="choices-label">보기</span>
+      <div class="choices">
+        {% for num in ["1","2","3","4"] %}
+          <label class="option" style="display:block;">
+            <input type="radio" name="choice" value="{{ num }}" {% if saved.get('c') == num %}checked{% endif %}>
+            <span class="num">{{ num }}</span>{{ q.options.get(num, "") }}
+          </label>
+        {% endfor %}
+      </div>
+    {% else %}
+      <span class="badge">실무</span><span class="badge">{{ section_label }}</span>
+      {% if p.points %}<span class="badge">{{ p.points }}점</span>{% endif %}
+      {% include "_q_prompt.html" %}
+      {% if gradable %}
+        {% if p.menu %}<span class="badge">{{ p.menu }}</span>{% endif %}
+        {% set sub = saved.get('sub') %}
+        {% include "_entry_form.html" %}
+      {% else %}
+        <p class="sub" style="margin-top:12px;">이 문항은 KcLep 메뉴에 직접 입력하는 문제라 자동 채점이 안 돼요.
+          필요하면 메모해 두고, 제출 후 정답 화면과 비교해 직접 채점하세요.</p>
+        <textarea name="memo" rows="4" style="width:100%;font-family:inherit;padding:10px;border:1px solid var(--border);border-radius:9px;background:var(--card);color:var(--ink);" placeholder="메모 (채점 안 함)">{{ saved.get('memo', '') }}</textarea>
+      {% endif %}
+    {% endif %}
+  </div>
+
+  <div class="row2">
+    {% if i > 0 %}<button type="submit" name="to" value="{{ i - 1 }}" class="btn-secondary">← 이전</button>{% endif %}
+    {% if i + 1 < total %}<button type="submit" name="to" value="{{ i + 1 }}">다음 →</button>{% endif %}
+  </div>
+  <button type="submit" name="to" value="submit" class="btn-secondary" style="margin-top:10px;"
+          onclick="return confirm('제출하고 채점할까요? 제출하면 더 고칠 수 없어요.');">제출하고 채점</button>
+</form>
+{% if left is not none %}
+<script>
+(function () {
+  var el = document.getElementById("timer");
+  var end = Date.now() + parseInt(el.dataset.left, 10) * 1000;
+  function tick() {
+    var s = Math.max(0, Math.round((end - Date.now()) / 1000));
+    el.textContent = Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+    if (s <= 300) el.style.color = "var(--bad)";
+    if (s === 0) {  // 시간 종료: 지금 화면의 답까지 저장하고 제출
+      var f = document.getElementById("simform");
+      var h = document.createElement("input");
+      h.type = "hidden"; h.name = "to"; h.value = "submit"; f.appendChild(h); f.submit();
+      return;
+    }
+    setTimeout(tick, 500);
+  }
+  tick();
+})();
+</script>
+{% endif %}
+{% endblock %}

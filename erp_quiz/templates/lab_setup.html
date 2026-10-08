@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}전표 입력 연습{% endblock %}
+{% block content %}
+<h1>⌨️ 전표 입력 연습</h1>
+<p class="sub">KcLep처럼 계정과 금액을 직접 입력하면 정답 분개와 비교해 채점해요. 일반전표 · 매입매출전표 · 오류수정 · 결산정리 문항이 대상이에요.</p>
+
+<div class="exam-switch">
+  {% for key in ['전산회계1급', '전산세무2급'] %}
+    <a href="{{ url_for('lab_setup', exam=key) }}" class="{{ 'active' if key == exam }}">{{ key }}</a>
+  {% endfor %}
+</div>
+
+<form method="post" action="{{ url_for('lab_start') }}" class="card">
+  <input type="hidden" name="exam" value="{{ exam }}">
+  <label>이름 (학습 기록 구분용)</label>
+  <input type="text" name="name" value="{{ name }}" placeholder="예: 홍길동">
+
+  <label>유형</label>
+  <select name="section">
+    <option value="">전체</option>
+    {% for sec, label in sections %}<option value="{{ sec }}">{{ label }}</option>{% endfor %}
+  </select>
+
+  <label>회차</label>
+  <select name="round">
+    <option value="">전체</option>
+    {% for r in rounds %}<option value="{{ r }}">{{ r }}</option>{% endfor %}
+  </select>
+
+  <label>문항 수 ({{ total }}문항 중)</label>
+  <input type="number" name="count" value="10" min="1" max="100">
+
+  <div class="checkbox-row">
+    <input type="checkbox" name="shuffle" id="shuffle" checked>
+    <label for="shuffle" style="margin:0">섞기</label>
+  </div>
+  {% if due %}
+  <div class="checkbox-row">
+    <input type="checkbox" name="review" id="review">
+    <label for="review" style="margin:0">오늘 복습할 카드만 ({{ due }}장)</label>
+  </div>
+  {% endif %}
+  <button type="submit">시작</button>
+</form>
+<a class="btn btn-secondary" href="{{ url_for('sim_setup', exam=exam) }}">🏁 실기 시험 시뮬레이션</a>
+<a class="btn btn-secondary" href="{{ url_for('silmu_setup', exam=exam) }}">🗂 실무 카드로</a>
+{% endblock %}

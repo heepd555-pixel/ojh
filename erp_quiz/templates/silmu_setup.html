@@ -49,6 +49,8 @@
 </form>
 
 <a class="btn" href="{{ url_for('pattern_index') }}">유형 교재로 보기 (유형별로 묶어서 읽기)</a>
+<a class="btn btn-secondary" href="{{ url_for('lab_setup', exam=exam) }}">⌨️ 전표 입력 연습 (직접 입력해서 채점)</a>
+<a class="btn btn-secondary" href="{{ url_for('sim_setup', exam=exam) }}">🏁 실기 시험 시뮬레이션</a>
 <a class="btn btn-secondary" href="{{ url_for('stats', exam=exam) }}">📊 약점·복습 현황</a>
 <a class="btn btn-secondary" href="{{ url_for('setup') }}">이론 문제로</a>
 {% endblock %}

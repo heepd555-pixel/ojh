@@ -12,8 +12,10 @@ SQLite 파일에 이름(사용자) 단위로 문항별 기록을 남긴다.
 저장 위치: 환경변수 DATA_DIR (기본값: 이 폴더의 data/). 클라우드에 올릴 때는
           재배포해도 지워지지 않는 디스크(Render Disk 등)를 DATA_DIR 로 지정해야 한다.
 """
+import json
 import os
 import sqlite3
+import uuid
 from contextlib import closing
 from datetime import date, datetime, timedelta, timezone
 
@@ -40,6 +42,12 @@ CREATE TABLE IF NOT EXISTS progress (
     PRIMARY KEY (user, kind, qid)
 );
 CREATE INDEX IF NOT EXISTS idx_due ON progress (user, kind, due);
+CREATE TABLE IF NOT EXISTS sim (      -- 실기 시험 시뮬레이션 한 판의 진행 상태
+    run_id TEXT PRIMARY KEY,
+    user   TEXT NOT NULL,
+    state  TEXT NOT NULL,             -- JSON
+    created TEXT NOT NULL
+);
 """
 
 
@@ -132,3 +140,27 @@ def stats(user, kind, exam=None, on=None):
                         "pct": round(ok / (ok + bad) * 100) if ok + bad else 0,
                         "due": r["due"] or 0})
     return out
+
+
+# ── 시험 시뮬레이션 상태 ────────────────────────────────────────────────
+# 답안 전체를 세션 쿠키(4KB)에 담을 수 없어 서버에 JSON 으로 둔다.
+def sim_create(user, state):
+    run_id = uuid.uuid4().hex[:12]
+    with closing(_connect()) as con, con:
+        con.execute("INSERT INTO sim (run_id,user,state,created) VALUES (?,?,?,?)",
+                    (run_id, norm(user), json.dumps(state, ensure_ascii=False),
+                     datetime.now(KST).isoformat(timespec="seconds")))
+    return run_id
+
+
+def sim_load(user, run_id):
+    with closing(_connect()) as con:
+        row = con.execute("SELECT state FROM sim WHERE run_id=? AND user=?",
+                          (run_id, norm(user))).fetchone()
+    return json.loads(row["state"]) if row else None
+
+
+def sim_save(user, run_id, state):
+    with closing(_connect()) as con, con:
+        con.execute("UPDATE sim SET state=? WHERE run_id=? AND user=?",
+                    (json.dumps(state, ensure_ascii=False), run_id, norm(user)))

@@ -1,0 +1,52 @@
+{# KcLep 전표입력 흉내. 변수: p, sub(이전 입력, 없으면 None) #}
+<style>
+  .ef-grid { display: grid; grid-template-columns: 74px 1fr 104px; gap: 6px; margin: 6px 0; }
+  .ef-grid select, .ef-grid input, .ef-vat select, .ef-vat input {
+    width: 100%; min-width: 0; padding: 10px 8px; font-size: 0.95rem; font-family: inherit;
+    border: 1px solid var(--border); border-radius: 9px; background: var(--card); color: var(--ink);
+  }
+  .ef-grid input.amt, .ef-vat input { text-align: right; font-variant-numeric: tabular-nums; }
+  .ef-head { font-size: 0.74rem; color: var(--ink-faint); font-weight: 700; margin-top: 10px; }
+  .ef-vat { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 6px; margin: 6px 0 4px; }
+  .ef-lbl { font-size: 0.74rem; color: var(--ink-faint); font-weight: 700; margin-top: 10px; }
+  .ef-add { margin-top: 4px; }
+</style>
+<datalist id="acct-list">
+  {% for name, code in acct_options() %}<option value="{{ name }}" label="{{ code }}">{% endfor %}
+</datalist>
+{% set v = (sub or {}).get('vat') or {} %}
+{% if p.vat %}
+  <div class="ef-lbl">매입매출전표 · 유형 / 공급가액 / 부가세</div>
+  <div class="ef-vat">
+    <select name="vat_type">
+      <option value="">유형</option>
+      {% for code, label in vat_options() %}
+        <option value="{{ code }}" {% if v.get('type') == code %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    <input name="vat_supply" inputmode="numeric" placeholder="공급가액" value="{{ v.get('supply', '') }}">
+    <input name="vat_vat" inputmode="numeric" placeholder="부가세" value="{{ v.get('vat', '') }}">
+  </div>
+{% endif %}
+<div class="ef-head">전표 분개 — 계정은 이름이나 코드(예: 101)로 입력</div>
+<div id="ef-rows">
+  {% for r in entry_rows(sub) %}
+    <div class="ef-grid">
+      <select name="side">
+        <option value="debit" {% if r.side == 'debit' %}selected{% endif %}>차변</option>
+        <option value="credit" {% if r.side == 'credit' %}selected{% endif %}>대변</option>
+      </select>
+      <input name="acct" list="acct-list" autocomplete="off" placeholder="계정과목" value="{{ r.acct }}">
+      <input class="amt" name="amt" inputmode="numeric" placeholder="금액" value="{{ r.amt }}">
+    </div>
+  {% endfor %}
+</div>
+<button type="button" class="btn-secondary ef-add" onclick="efAdd()">+ 줄 추가</button>
+<script>
+  function efAdd() {
+    var rows = document.getElementById("ef-rows");
+    var last = rows.lastElementChild.cloneNode(true);
+    last.querySelectorAll("input").forEach(function (i) { i.value = ""; });
+    rows.appendChild(last);
+  }
+</script>

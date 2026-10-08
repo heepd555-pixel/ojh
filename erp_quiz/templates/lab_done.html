@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}전표 입력 결과{% endblock %}
+{% block content %}
+<h1>결과</h1>
+<div class="card">
+  <div class="score-big">{{ '%g' % pts }} / {{ '%g' % mx }}점</div>
+  <p class="sub" style="text-align:center;">완전 정답 {{ full }} / {{ total }}문항</p>
+</div>
+<a class="btn" href="{{ url_for('lab_setup') }}">다시 하기</a>
+<a class="btn btn-secondary" href="{{ url_for('stats') }}">📊 약점·복습 현황</a>
+{% endblock %}

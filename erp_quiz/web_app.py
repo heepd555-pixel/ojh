@@ -26,6 +26,7 @@ from datetime import timedelta
 from flask import Flask, redirect, render_template, request, session, url_for
 
 import accounts
+import grader
 import patterns
 import store
 from quiz import filter_questions, load_questions, round_sort_key
@@ -649,6 +650,366 @@ def silmu_done():
         "silmu_done.html", total=len(idxs), ok=session.get("silmu_ok", 0),
         hard=hard, section_label=_section_label, left=len(_practice_review()),
     )
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 실기 환경: 전표 직접 입력 연습(/lab) + 회차 단위 시험 시뮬레이션(/sim)
+#
+# 실무 카드는 답을 펼쳐 놓고 스스로 맞춰 보는 방식이라, 실제 시험에서 손으로 입력하는
+# 감각이 안 길러진다. 여기서는 KcLep 입력칸과 비슷한 폼에 직접 입력하고
+# grader.py 가 정답 분개와 비교해 채점한다. 시뮬레이션은 이론 30점 + 실무 70점으로
+# 회차 한 세트를 제한 시간 안에 풀게 한다.
+# ─────────────────────────────────────────────────────────────────────
+_P_BY_ID = {p["id"]: p for p in PRACTICE}
+_Q_BY_ID = {q["id"]: q for q in QUESTIONS}
+EXAM_MINUTES = {"전산회계1급": 60, "전산세무2급": 90}  # 실제 시험 시간(이론+실무)
+THEORY_TOTAL = 30       # 이론 배점. 실무는 회차마다 70점.
+SIM_EXAMS = ("전산회계1급", "전산세무2급")
+SIM_GRACE = 30          # 시간 종료 직후 마지막 답을 저장해 주는 유예(초)
+
+
+@app.template_global()
+def acct_options():
+    """계정 입력칸 자동완성 목록 [(이름, 코드)]."""
+    return sorted(accounts.CODES.items(), key=lambda kv: kv[1])
+
+
+@app.template_global()
+def vat_options():
+    return [(c, "%s.%s (%s)" % (c, v[0], v[1])) for c, v in sorted(accounts.VAT_TYPES.items())]
+
+
+@app.template_global()
+def entry_rows(sub):
+    rows = list((sub or {}).get("rows") or [])
+    if rows:
+        return rows
+    return ([{"side": "debit", "acct": "", "amt": ""} for _ in range(2)]
+            + [{"side": "credit", "acct": "", "amt": ""} for _ in range(2)])
+
+
+def _parse_entry_form(form):
+    """입력 폼 -> grader 가 받는 제출물. 빈 줄은 버려 세션 쿠키를 아낀다."""
+    rows = []
+    for s, a, m in zip(form.getlist("side"), form.getlist("acct"), form.getlist("amt")):
+        a, m = a.strip()[:40], m.strip()[:20]
+        if a or m:
+            rows.append({"side": "credit" if s == "credit" else "debit", "acct": a, "amt": m})
+    sub = {"rows": rows[:14]}
+    if "vat_type" in form:
+        sub["vat"] = {"type": form.get("vat_type", "")[:4],
+                      "supply": form.get("vat_supply", "").strip()[:20],
+                      "vat": form.get("vat_vat", "").strip()[:20]}
+    return sub
+
+
+def _round_no(r):
+    m = re.search(r"\d+", str(r or ""))
+    return int(m.group()) if m else -1
+
+
+# ── 전표 입력 연습 ────────────────────────────────────────────────────
+def _lab_pool(exam):
+    return [(i, p) for i, p in enumerate(PRACTICE) if p["exam"] == exam and grader.gradable(p)]
+
+
+@app.route("/lab")
+def lab_setup():
+    exam = request.args.get("exam")
+    if exam not in SIM_EXAMS:
+        exam = "전산회계1급"
+    _migrate_cookie_notes()
+    pool = _lab_pool(exam)
+    sections, seen = [], set()
+    for _, p in sorted(pool, key=lambda ip: ip[1]["section"]):
+        if p["section"] not in seen:
+            seen.add(p["section"])
+            sections.append((p["section"], _section_label(p)))
+    due = _practice_review()
+    return render_template(
+        "lab_setup.html", exam=exam, sections=sections, name=session.get("name", ""),
+        rounds=sorted({p["round"] for _, p in pool}, key=_round_no, reverse=True),
+        total=len(pool), due=len([1 for _, p in pool if p["id"] in due]),
+    )
+
+
+@app.route("/lab/start", methods=["POST"])
+def lab_start():
+    f = request.form
+    if f.get("name", "").strip():
+        session["name"] = f["name"].strip()
+        session.permanent = True
+    exam = f.get("exam") if f.get("exam") in SIM_EXAMS else "전산회계1급"
+    due = _practice_review() if f.get("review") == "on" else None
+    pool = [(i, p) for i, p in _lab_pool(exam)
+            if (not f.get("section") or p["section"] == f["section"])
+            and (not f.get("round") or p["round"] == f["round"])
+            and (due is None or p["id"] in due)]
+    if f.get("shuffle") == "on":
+        random.shuffle(pool)
+    else:
+        pool.sort(key=lambda ip: (-_round_no(ip[1]["round"]), ip[1]["section"], _round_no(ip[1]["no"])))
+    try:
+        count = max(1, int(f.get("count") or 10))
+    except ValueError:
+        count = 10
+    pool = pool[:count]
+    if not pool:
+        return redirect(url_for("lab_setup", exam=exam))
+    session["lab_ids"] = [i for i, _ in pool]
+    session["lab_idx"] = 0
+    session["lab_sub"] = None
+    session["lab_pts"], session["lab_max"], session["lab_full"] = 0.0, 0.0, 0
+    session.permanent = True
+    return redirect(url_for("lab_q"))
+
+
+@app.route("/lab/q")
+def lab_q():
+    ids = session.get("lab_ids")
+    if not ids:
+        return redirect(url_for("lab_setup"))
+    i = session.get("lab_idx", 0)
+    if i >= len(ids):
+        return redirect(url_for("lab_done"))
+    p = PRACTICE[ids[i]]
+    sub = session.get("lab_sub")
+    labels = [s.get("label") for s in p.get("entry_sets") or []]
+    return render_template(
+        "lab_q.html", p=p, section_label=_section_label(p), idx=i + 1, total=len(ids),
+        sub=sub, r=grader.grade(p, sub) if sub is not None else None,
+        is_last=(i + 1 == len(ids)), has_fix="수정 후" in labels,
+    )
+
+
+@app.route("/lab/grade", methods=["POST"])
+def lab_grade():
+    ids = session.get("lab_ids")
+    i = session.get("lab_idx", 0)
+    if not ids or i >= len(ids) or session.get("lab_sub") is not None:
+        return redirect(url_for("lab_q"))  # 새로고침으로 같은 답을 두 번 세지 않는다
+    p = PRACTICE[ids[i]]
+    sub = _parse_entry_form(request.form)
+    r = grader.grade(p, sub)
+    store.record(_user(), "silmu", p["id"], p["exam"], _PAT_OF.get(p["id"], ""), r["full"])
+    session["lab_sub"] = sub
+    session["lab_pts"] = session.get("lab_pts", 0.0) + r["score"]
+    session["lab_max"] = session.get("lab_max", 0.0) + r["points"]
+    session["lab_full"] = session.get("lab_full", 0) + int(r["full"])
+    return redirect(url_for("lab_q"))
+
+
+@app.route("/lab/next", methods=["POST"])
+def lab_next():
+    session["lab_idx"] = session.get("lab_idx", 0) + 1
+    session["lab_sub"] = None
+    return redirect(url_for("lab_q"))
+
+
+@app.route("/lab/done")
+def lab_done():
+    return render_template(
+        "lab_done.html", pts=round(session.get("lab_pts", 0.0), 1), mx=session.get("lab_max", 0.0),
+        full=session.get("lab_full", 0), total=len(session.get("lab_ids") or []),
+    )
+
+
+# ── 실기 시험 시뮬레이션 ───────────────────────────────────────────────
+def _sim_exam(args):
+    exam = args.get("exam")
+    return exam if exam in SIM_EXAMS else "전산회계1급"
+
+
+def _sim_load():
+    run = session.get("sim_run")
+    return (run, store.sim_load(_user(), run)) if run else (None, None)
+
+
+def _sim_left(st):
+    """남은 초(시간제한 없으면 None, 지나면 0 이하)."""
+    return None if not st.get("deadline") else st["deadline"] - int(time.time())
+
+
+def _filled(a):
+    sub = a.get("sub") or {}
+    vat = sub.get("vat") or {}
+    return bool(a.get("c") or a.get("memo") or sub.get("rows") or any(vat.values()))
+
+
+@app.route("/sim")
+def sim_setup():
+    exam = _sim_exam(request.args)
+    theory_n = {}
+    for q in QUESTIONS:
+        if q.get("exam") == exam and q["type"] == "theory" and q.get("answer"):
+            theory_n[q["round"]] = theory_n.get(q["round"], 0) + 1
+    rounds = sorted({p["round"] for p in PRACTICE if p["exam"] == exam}, key=_round_no, reverse=True)
+    return render_template(
+        "sim_setup.html", exam=exam, name=session.get("name", ""),
+        rounds=[(r, theory_n.get(r, 0)) for r in rounds], minutes=EXAM_MINUTES[exam],
+    )
+
+
+@app.route("/sim/start", methods=["POST"])
+def sim_start():
+    f = request.form
+    if f.get("name", "").strip():
+        session["name"] = f["name"].strip()
+        session.permanent = True
+    exam = _sim_exam(f)
+    rnd = f.get("round", "")
+    theory = sorted((q for q in QUESTIONS if q.get("exam") == exam and q["type"] == "theory"
+                     and q.get("answer") and q["round"] == rnd), key=lambda q: _round_no(q["num"]))
+    prac = sorted((p for p in PRACTICE if p["exam"] == exam and p["round"] == rnd),
+                  key=lambda p: (p["section"], _round_no(p["no"])))
+    if not prac:
+        return redirect(url_for("sim_setup", exam=exam))
+    try:
+        minutes = max(0, int(f.get("minutes") or 0))
+    except ValueError:
+        minutes = 0
+    now = int(time.time())
+    state = {"exam": exam, "round": rnd, "start": now, "deadline": now + minutes * 60 if minutes else 0,
+             "items": [{"k": "t", "id": q["id"]} for q in theory] + [{"k": "p", "id": p["id"]} for p in prac],
+             "ans": {}, "self": {}, "done": False, "end": 0}
+    session["sim_run"] = store.sim_create(_user(), state)
+    session.permanent = True
+    return redirect(url_for("sim_q", i=0))
+
+
+@app.route("/sim/q/<int:i>")
+def sim_q(i):
+    run, st = _sim_load()
+    if not st:
+        return redirect(url_for("sim_setup"))
+    left = _sim_left(st)
+    if st["done"] or (left is not None and left <= 0):
+        return redirect(url_for("sim_result"))
+    items = st["items"]
+    if not 0 <= i < len(items):
+        return redirect(url_for("sim_q", i=0))
+    item = items[i]
+    ctx = dict(state=st, i=i, total=len(items), item=item, left=left,
+               saved=st["ans"].get(str(i), {}),
+               answered=[_filled(st["ans"].get(str(j), {})) for j in range(len(items))])
+    if item["k"] == "t":
+        n_t = sum(1 for it in items if it["k"] == "t")
+        ctx.update(q=_Q_BY_ID[item["id"]], tpoints=THEORY_TOTAL / n_t)
+    else:
+        p = _P_BY_ID[item["id"]]
+        ctx.update(p=p, gradable=grader.gradable(p), section_label=_section_label(p))
+    return render_template("sim_q.html", **ctx)
+
+
+def _sim_compute(st):
+    items = st["items"]
+    n_t = sum(1 for it in items if it["k"] == "t")
+    tpts = THEORY_TOTAL / n_t if n_t else 0.0
+    rows, theory, prac, by_sec = [], 0.0, 0.0, {}
+    for i, it in enumerate(items):
+        a = st["ans"].get(str(i), {})
+        if it["k"] == "t":
+            q = _Q_BY_ID[it["id"]]
+            ok = is_correct(a.get("c"), q["answer"])
+            earned, mx, label = (tpts if ok else 0.0), tpts, "이론"
+            theory += earned
+            rows.append({"item": it, "index": i, "q": q, "chosen": a.get("c"), "ok": ok,
+                         "earned": earned, "max": mx, "label": label})
+        else:
+            p = _P_BY_ID[it["id"]]
+            mx, label = float(p.get("points") or 0), _section_label(p)
+            row = {"item": it, "index": i, "p": p, "max": mx, "label": label, "r": None,
+                   "memo": a.get("memo", ""), "self_ok": bool(st.get("self", {}).get(str(i)))}
+            if grader.gradable(p):
+                row["r"] = grader.grade(p, a.get("sub") or {"rows": []})
+                earned = row["r"]["score"]
+            else:
+                earned = mx if row["self_ok"] else 0.0
+            row["earned"] = earned
+            prac += earned
+            rows.append(row)
+        s = by_sec.setdefault(label, [0.0, 0.0])
+        s[0] += earned
+        s[1] += mx
+    manual = [r for r in rows if r["item"]["k"] == "p" and r["r"] is None]
+    return {"rows": rows, "theory": theory, "prac": prac, "total": theory + prac,
+            "by_section": [(k, v[0], v[1]) for k, v in by_sec.items()],
+            "self_total": len(manual),
+            "self_pending": len([r for r in manual if not r["self_ok"]]),
+            "self_pending_pts": sum(r["max"] for r in manual if not r["self_ok"])}
+
+
+def _sim_finish(run, st):
+    """제출/시간 종료. 학습 기록(복습 간격)은 이때 한 번만 남긴다."""
+    if st["done"]:
+        return
+    st["done"], st["end"] = True, int(time.time())
+    for row in _sim_compute(st)["rows"]:
+        if row["item"]["k"] == "t":
+            store.record(_user(), "theory", row["q"]["id"], row["q"].get("exam", ""),
+                         row["q"]["round"], row["ok"])
+        elif row["r"] is not None:
+            p = row["p"]
+            store.record(_user(), "silmu", p["id"], p["exam"], _PAT_OF.get(p["id"], ""), row["r"]["full"])
+    store.sim_save(_user(), run, st)
+
+
+@app.route("/sim/save/<int:i>", methods=["POST"])
+def sim_save(i):
+    run, st = _sim_load()
+    if not st or st["done"]:
+        return redirect(url_for("sim_result" if st else "sim_setup"))
+    left = _sim_left(st)
+    items = st["items"]
+    if 0 <= i < len(items) and (left is None or left > -SIM_GRACE):
+        f = request.form
+        if items[i]["k"] == "t":
+            if f.get("choice") in ("1", "2", "3", "4"):
+                st["ans"][str(i)] = {"c": f["choice"]}
+        elif grader.gradable(_P_BY_ID[items[i]["id"]]):
+            st["ans"][str(i)] = {"sub": _parse_entry_form(f)}
+        else:
+            st["ans"][str(i)] = {"memo": f.get("memo", "")[:500]}
+        store.sim_save(_user(), run, st)
+    to = request.form.get("to", "")
+    if to == "submit" or (left is not None and left <= 0):
+        _sim_finish(run, st)
+        return redirect(url_for("sim_result"))
+    return redirect(url_for("sim_q", i=int(to) if to.isdigit() else i))
+
+
+@app.route("/sim/result")
+def sim_result():
+    run, st = _sim_load()
+    if not st:
+        return redirect(url_for("sim_setup"))
+    left = _sim_left(st)
+    timed_out = left is not None and left <= 0
+    if not st["done"]:
+        if not timed_out:
+            return redirect(url_for("sim_q", i=0))
+        _sim_finish(run, st)
+    res = _sim_compute(st)
+    used = max(0, (st["end"] or int(time.time())) - st["start"])
+    return render_template(
+        "sim_result.html", state=st, timed_out=timed_out and used >= (st["deadline"] - st["start"]) - 1,
+        time_used="%d분 %02d초" % (used // 60, used % 60),
+        total=res["total"], theory_pts=res["theory"], prac_pts=res["prac"], rows=res["rows"],
+        by_section=res["by_section"], self_total=res["self_total"],
+        self_pending=res["self_pending"], self_pending_pts=res["self_pending_pts"],
+    )
+
+
+@app.route("/sim/selfmark", methods=["POST"])
+def sim_selfmark():
+    run, st = _sim_load()
+    if not st or not st["done"]:
+        return redirect(url_for("sim_setup"))
+    manual = {str(i) for i, it in enumerate(st["items"])
+              if it["k"] == "p" and not grader.gradable(_P_BY_ID[it["id"]])}
+    st["self"] = {i: True for i in request.form.getlist("ok") if i in manual}
+    store.sim_save(_user(), run, st)
+    return redirect(url_for("sim_result"))
 
 
 @app.route("/stats")

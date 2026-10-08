@@ -1,0 +1,14 @@
+{# 실무 문항의 문제 부분(거래 자료·증빙 서식). 정답은 절대 여기서 보이지 않는다. 변수: p #}
+<span class="q-label">거래 / 자료</span>
+{% if p.q_render %}
+  {% for name in p.q_render %}
+    <img class="shot" loading="lazy" src="{{ url_for('static', filename='official/' + name) }}" alt="문제">
+  {% endfor %}
+  <details><summary class="shot-hint">글자로 보기</summary>
+    <div class="explanation">{{ p.question }}</div></details>
+{% else %}
+  <div class="stem">{{ p.question }}</div>
+  {% for name in p.q_images %}
+    <img class="shot" loading="lazy" src="{{ url_for('static', filename='official/' + name) }}" alt="증빙 서식">
+  {% endfor %}
+{% endif %}

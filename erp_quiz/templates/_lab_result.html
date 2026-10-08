@@ -1,0 +1,34 @@
+{# 채점 결과 표. 변수: r(grader.grade 결과), p #}
+<div class="result-banner {{ 'correct' if r.full else 'wrong' }}">
+  {{ '✓ 정답' if r.full else ('△ 부분 정답' if r.score > 0 else '✗ 오답') }}
+  · {{ '%g' % r.score }} / {{ '%g' % r.points }}점
+</div>
+{% if r.label %}<p class="sub" style="margin:0 0 8px;">기준: {{ r.label }} 분개</p>{% endif %}
+{% if r.vat %}
+  <span class="q-label">매입매출 입력값</span>
+  {% for x in r.vat %}
+    <div class="wrong-item">{{ '✓' if x.ok else '✗' }} <b>{{ x.label }}</b> — 정답
+      {{ x.want }}{% if not x.ok %} · 내 입력 {{ x.have if x.have is not none else '없음' }}{% endif %}</div>
+  {% endfor %}
+{% endif %}
+<span class="q-label">분개</span>
+{% for l in r.lines %}
+  <div class="wrong-item">
+    {{ '✓' if l.status == 'ok' else '✗' }}
+    {{ '차변' if l.side == 'debit' else '대변' }} <b>{{ l.acct }}</b> {{ '{:,}'.format(l.amt) }}
+    {% if l.status == 'amount' %}<br><span class="sub">금액이 달라요 — 내 입력 {{ '{:,}'.format(l.given) if l.given is not none else '없음' }}</span>{% endif %}
+    {% if l.status == 'missing' %}<br><span class="sub">입력하지 않았어요</span>{% endif %}
+    {% if l.note %}<br><span class="sub">{{ l.note }}</span>{% endif %}
+  </div>
+{% endfor %}
+{% if r.extras %}
+  <span class="q-label">답에 없는 줄</span>
+  {% for u in r.extras %}
+    <div class="wrong-item">✗ {{ '차변' if u.side == 'debit' else '대변' }} {{ u.raw or '(계정 없음)' }}
+      {{ '{:,}'.format(u.amt) if u.amt is not none else '' }}</div>
+  {% endfor %}
+{% endif %}
+{% if p.notes %}
+  <details><summary class="shot-hint">입력 단계 보기</summary>
+    <div class="steps"><ul>{% for n in p.notes %}<li>{{ n.lstrip('ㆍ· ') }}</li>{% endfor %}</ul></div></details>
+{% endif %}

@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}{{ idx }}/{{ total }} 전표 입력{% endblock %}
+{% block content %}
+<p class="progress">{{ idx }} / {{ total }}</p>
+<div class="card">
+  <div>
+    <span class="badge">{{ p.exam }}</span><span class="badge">{{ p.round }}</span>
+    <span class="badge">{{ section_label }}</span>
+    {% if p.points %}<span class="badge">{{ p.points }}점</span>{% endif %}
+  </div>
+  {% include "_q_prompt.html" %}
+  {% if p.menu %}<span class="badge">{{ p.menu }}</span>{% endif %}
+  {% if has_fix %}<p class="sub" style="margin:8px 0 0;">오류수정 문항 — <b>수정 후</b>에 남아야 할 분개를 입력하세요.</p>{% endif %}
+
+  {% if r is none %}
+    <form method="post" action="{{ url_for('lab_grade') }}">
+      {% include "_entry_form.html" %}
+      <button type="submit" style="margin-top:12px;">채점</button>
+    </form>
+  {% else %}
+    {% include "_lab_result.html" %}
+    <form method="post" action="{{ url_for('lab_next') }}">
+      <button type="submit">{{ '결과 보기' if is_last else '다음' }}</button>
+    </form>
+  {% endif %}
+</div>
+{% endblock %}
